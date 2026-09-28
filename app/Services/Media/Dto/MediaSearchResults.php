@@ -16,12 +16,15 @@ final readonly class MediaSearchResults
      * @param  list<string>  $failedSources  Sumber yang gagal dan tidak tergantikan.
      * @param  list<string>  $skippedSources  Sumber yang dilewati karena belum dikonfigurasi.
      * @param  array<string, string>  $fallbackSources  Sumber gagal => sumber cadangan yang dipakai.
+     * @param  list<array{id: int, name: string, name_latin: ?string, photo_url: ?string, department: ?string, known_for: list<string>, popularity: float}>  $people
+     *                                                                                                                                                                Orang (aktor, sutradara, …) yang cocok dengan kata kunci.
      */
     public function __construct(
         public Collection $media,
         public array $failedSources = [],
         public array $skippedSources = [],
         public array $fallbackSources = [],
+        public array $people = [],
     ) {}
 
     public static function empty(): self
@@ -31,7 +34,7 @@ final readonly class MediaSearchResults
 
     public function isEmpty(): bool
     {
-        return $this->media->isEmpty();
+        return $this->media->isEmpty() && $this->people === [];
     }
 
     public function hasProblems(): bool

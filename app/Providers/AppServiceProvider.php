@@ -3,25 +3,26 @@
 namespace App\Providers;
 
 use App\Contracts\MediaProvider;
+use App\Models\MediaCache;
 use App\Services\Media\MediaSearchService;
 use App\Services\Media\Providers\AniListProvider;
 use App\Services\Media\Providers\JikanProvider;
 use App\Services\Media\Providers\TmdbProvider;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    private const PRIMARY_MEDIA_PROVIDERS = 'media.providers.primary';
-
-    private const FALLBACK_MEDIA_PROVIDERS = 'media.providers.fallback';
-
     /**
      * Sumber media utama, ditembak paralel di setiap pencarian.
      *
      * AniList dipilih sebagai sumber anime utama karena Jikan/MyAnimeList
-     * kerap membalas 504.
+     * kerap membalas 504. Hasil anime ikut masuk Film (movie) atau Series.
      *
      * @var list<class-string<MediaProvider>>
      */
@@ -31,13 +32,13 @@ class AppServiceProvider extends ServiceProvider
     ];
 
     /**
-     * Sumber cadangan, hanya dipakai kalau sumber utama untuk media type yang
-     * sama sedang gagal — mis. Jikan menggantikan AniList saat AniList mati.
+     * Sumber utama => cadangannya, hanya dipakai kalau sumber utama itu sedang
+     * gagal — mis. Jikan menggantikan AniList saat AniList mati.
      *
-     * @var list<class-string<MediaProvider>>
+     * @var array<class-string<MediaProvider>, class-string<MediaProvider>>
      */
     private const FALLBACK = [
-        JikanProvider::class,
+        AniListProvider::class => JikanProvider::class,
     ];
 
     /**
@@ -45,16 +46,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        foreach ([...self::PRIMARY, ...self::FALLBACK] as $provider) {
+        foreach ([...self::PRIMARY, ...array_values(self::FALLBACK)] as $provider) {
             $this->app->singleton($provider);
         }
 
-        $this->app->tag(self::PRIMARY, self::PRIMARY_MEDIA_PROVIDERS);
-        $this->app->tag(self::FALLBACK, self::FALLBACK_MEDIA_PROVIDERS);
-
         $this->app->singleton(MediaSearchService::class, fn ($app) => new MediaSearchService(
-            collect($app->tagged(self::PRIMARY_MEDIA_PROVIDERS))->values(),
-            collect($app->tagged(self::FALLBACK_MEDIA_PROVIDERS))->values(),
+            collect(self::PRIMARY)->map(fn (string $provider) => $app->make($provider)),
+            collect(self::FALLBACK)->mapWithKeys(fn (string $backup, string $primary) => [
+                $app->make($primary)->key() => $app->make($backup),
+            ]),
         ));
     }
 
@@ -64,6 +64,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::shouldBeStrict(! $this->app->isProduction());
+
+        // Kuota gratis Gemini dibatasi per menit; job insight menunggu gilirannya.
+        RateLimiter::for('gemini', fn () => Limit::perMinute(8));
+
+        // Slug media hanya unik per tipe, jadi {media} dicari bersama {type} dari
+        // $route yang sedang di-bind — bukan request() global: Livewire menjalankan
+        // ulang binding ini di setiap request /livewire/update (wire:init, klik
+        // tombol) di atas request palsu berisi URL halaman asal.
+        Route::bind('media', fn (string $slug, $route) => MediaCache::findBySlug($route->parameter('type'), $slug)
+            ?? throw (new ModelNotFoundException)->setModel(MediaCache::class, [$slug]));
 
         if ($this->app->isProduction()) {
             URL::forceScheme('https');

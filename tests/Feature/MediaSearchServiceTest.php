@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Sumber utama: TMDB (film + series) dan AniList (anime).
+ * Sumber utama: TMDB dan AniList, keduanya mengisi Film + Series (anime movie
+ * masuk Film, anime berepisode masuk Series).
  * Sumber cadangan: Jikan, hanya dipakai kalau AniList gagal.
  */
 class MediaSearchServiceTest extends TestCase
@@ -104,6 +105,23 @@ class MediaSearchServiceTest extends TestCase
                             ],
                             'popularity' => 480000,
                         ],
+                        [
+                            'id' => 142770,
+                            'title' => [
+                                'romaji' => 'Suzume no Tojimari',
+                                'english' => 'Suzume',
+                                'native' => 'すずめの戸締まり',
+                            ],
+                            'description' => 'Gadis yang menutup pintu bencana.',
+                            'coverImage' => ['extraLarge' => 'https://img.anili.st/suzume-xl.jpg', 'large' => null],
+                            'bannerImage' => null,
+                            'startDate' => ['year' => 2022, 'month' => 11, 'day' => 11],
+                            'seasonYear' => null,
+                            'format' => 'MOVIE',
+                            'genres' => ['Adventure', 'Fantasy'],
+                            'tags' => [],
+                            'popularity' => 150000,
+                        ],
                     ],
                 ],
             ],
@@ -119,6 +137,7 @@ class MediaSearchServiceTest extends TestCase
             'data' => [
                 [
                     'mal_id' => 52991,
+                    'type' => 'TV',
                     'title' => 'Sousou no Frieren',
                     'title_english' => "Frieren: Beyond Journey's End",
                     'title_japanese' => '葬送のフリーレン',
@@ -151,7 +170,7 @@ class MediaSearchServiceTest extends TestCase
         ]);
     }
 
-    public function test_it_merges_film_series_and_anime_into_one_result_set(): void
+    public function test_it_merges_film_and_series_from_every_source_into_one_result_set(): void
     {
         $this->fakeHealthyPrimaries();
 
@@ -159,10 +178,24 @@ class MediaSearchServiceTest extends TestCase
 
         $this->assertFalse($results->isEmpty());
         $this->assertEqualsCanonicalizing(
-            [MediaType::Film->value, MediaType::Series->value, MediaType::Anime->value],
+            [MediaType::Film->value, MediaType::Series->value],
             $results->media->pluck('media_type')->map->value->unique()->values()->all(),
         );
+        $this->assertEqualsCanonicalizing(
+            [MediaSource::Tmdb->value, MediaSource::Anilist->value],
+            $results->media->pluck('source')->map->value->unique()->values()->all(),
+        );
         $this->assertSame([], $results->failedSources);
+    }
+
+    public function test_anime_movies_become_films_and_episodic_anime_become_series(): void
+    {
+        $this->fakeHealthyPrimaries();
+
+        $this->service()->search('frieren');
+
+        $this->assertSame(MediaType::Series, MediaCache::where('external_id', '154587')->sole()->media_type);
+        $this->assertSame(MediaType::Film, MediaCache::where('external_id', '142770')->sole()->media_type);
     }
 
     public function test_it_caches_normalised_tmdb_results_into_media_cache(): void
@@ -171,7 +204,7 @@ class MediaSearchServiceTest extends TestCase
 
         $this->service()->search('interstellar');
 
-        $this->assertDatabaseCount('media_cache', 3);
+        $this->assertDatabaseCount('media_cache', 4);
 
         $film = MediaCache::where('external_id', '157336')->sole();
 
@@ -188,11 +221,11 @@ class MediaSearchServiceTest extends TestCase
     {
         $this->fakeHealthyPrimaries();
 
-        $this->service()->search('frieren', MediaType::Anime);
+        $this->service()->search('frieren', MediaType::Series);
 
         $anime = MediaCache::where('source', MediaSource::Anilist->value)->sole();
 
-        $this->assertSame(MediaType::Anime, $anime->media_type);
+        $this->assertSame(MediaType::Series, $anime->media_type);
         $this->assertSame('154587', $anime->external_id);
         $this->assertSame("Frieren: Beyond Journey's End", $anime->title);
         $this->assertSame('葬送のフリーレン', $anime->original_title);
@@ -212,6 +245,87 @@ class MediaSearchServiceTest extends TestCase
         );
     }
 
+    public function test_an_empty_indonesian_synopsis_is_patched_from_the_original_language(): void
+    {
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/genre/')) {
+                return Http::response(['genres' => []]);
+            }
+
+            if (str_contains($request->url(), 'anilist.co')) {
+                return Http::response(['data' => ['Page' => ['media' => []]]]);
+            }
+
+            $film = [
+                'id' => 157336,
+                'media_type' => 'movie',
+                'title' => 'Interstellar',
+                'poster_path' => '/poster.jpg',
+                'release_date' => '2014-11-05',
+                'genre_ids' => [],
+                'popularity' => 120.5,
+            ];
+
+            // TMDB membalas overview kosong untuk judul yang belum diterjemahkan.
+            return str_contains($request->url(), 'language=en-US')
+                ? Http::response(['results' => [$film + ['overview' => 'A team of explorers travel through a wormhole.']]])
+                : Http::response(['results' => [$film + ['overview' => '']]]);
+        });
+
+        $this->service()->search('interstellar', MediaType::Film);
+
+        $film = MediaCache::where('external_id', '157336')->sole();
+
+        $this->assertSame('A team of explorers travel through a wormhole.', $film->synopsis);
+    }
+
+    public function test_an_existing_indonesian_synopsis_wins_over_the_fallback_language(): void
+    {
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/genre/')) {
+                return Http::response(['genres' => []]);
+            }
+
+            if (str_contains($request->url(), 'anilist.co')) {
+                return Http::response(['data' => ['Page' => ['media' => []]]]);
+            }
+
+            $film = [
+                'id' => 157336,
+                'media_type' => 'movie',
+                'title' => 'Interstellar',
+                'poster_path' => '/poster.jpg',
+                'release_date' => '2014-11-05',
+                'genre_ids' => [],
+                'popularity' => 120.5,
+            ];
+
+            return str_contains($request->url(), 'language=en-US')
+                ? Http::response(['results' => [$film + ['overview' => 'A team of explorers.']]])
+                : Http::response(['results' => [$film + ['overview' => 'Sekelompok penjelajah menembus lubang cacing.']]]);
+        });
+
+        $this->service()->search('interstellar', MediaType::Film);
+
+        $film = MediaCache::where('external_id', '157336')->sole();
+
+        $this->assertSame('Sekelompok penjelajah menembus lubang cacing.', $film->synopsis);
+    }
+
+    public function test_the_fallback_language_request_is_skipped_when_already_english(): void
+    {
+        config(['services.tmdb.language' => 'en-US']);
+
+        $this->fakeHealthyPrimaries();
+
+        $this->service()->search('interstellar', MediaType::Film);
+
+        $this->assertCount(
+            1,
+            Http::recorded(fn ($request) => str_contains($request->url(), '/search/multi')),
+        );
+    }
+
     public function test_repeating_a_search_updates_instead_of_duplicating_rows(): void
     {
         $this->fakeHealthyPrimaries();
@@ -221,7 +335,18 @@ class MediaSearchServiceTest extends TestCase
         cache()->flush();
         $this->service()->search('interstellar');
 
-        $this->assertDatabaseCount('media_cache', 3);
+        $this->assertDatabaseCount('media_cache', 4);
+    }
+
+    public function test_search_results_get_a_url_slug(): void
+    {
+        $this->fakeHealthyPrimaries();
+
+        $this->service()->search('interstellar');
+
+        $this->assertSame(url('/film/interstellar'), MediaCache::where('external_id', '157336')->sole()->url());
+        $this->assertSame(url('/series/breaking-bad'), MediaCache::where('external_id', '1396')->sole()->url());
+        $this->assertSame(0, MediaCache::whereNull('slug')->count());
     }
 
     public function test_it_skips_person_results_from_tmdb(): void
@@ -233,18 +358,68 @@ class MediaSearchServiceTest extends TestCase
         $this->assertDatabaseMissing('media_cache', ['external_id' => '999']);
     }
 
-    public function test_filtering_by_type_only_queries_the_relevant_provider(): void
+    public function test_filtering_by_film_keeps_films_and_anime_movies_only(): void
     {
         $this->fakeHealthyPrimaries();
 
-        $results = $this->service()->search('frieren', MediaType::Anime);
+        $results = $this->service()->search('interstellar', MediaType::Film);
 
-        $this->assertSame(
-            [MediaType::Anime->value],
-            $results->media->pluck('media_type')->map->value->unique()->values()->all(),
+        $this->assertEqualsCanonicalizing(
+            ['Interstellar', 'Suzume'],
+            $results->media->pluck('title')->all(),
         );
 
-        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'themoviedb.org'));
+        // AniList diminta menyaring format di sisi server.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'anilist.co')
+            && $request['variables']['formatIn'] === ['MOVIE']
+            && ! array_key_exists('formatNotIn', $request['variables']));
+    }
+
+    public function test_filtering_by_series_keeps_series_and_episodic_anime_only(): void
+    {
+        $this->fakeHealthyPrimaries();
+
+        $results = $this->service()->search('interstellar', MediaType::Series);
+
+        $this->assertEqualsCanonicalizing(
+            ['Breaking Bad', "Frieren: Beyond Journey's End"],
+            $results->media->pluck('title')->all(),
+        );
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'anilist.co')
+            && ! array_key_exists('formatIn', $request['variables'])
+            && $request['variables']['formatNotIn'] === ['MOVIE']);
+    }
+
+    public function test_an_unfiltered_search_sends_no_null_variables_to_anilist(): void
+    {
+        $this->fakeHealthyPrimaries();
+
+        $this->service()->search('frieren');
+
+        // AniList membalas 500 untuk variabel list bernilai null.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'anilist.co')
+            && ! in_array(null, $request['variables'], true)
+            && ! array_key_exists('formatIn', $request['variables'])
+            && ! array_key_exists('formatNotIn', $request['variables']));
+    }
+
+    public function test_jikan_movies_become_films(): void
+    {
+        $movie = ['mal_id' => 50594, 'type' => 'Movie', 'title' => 'Suzume no Tojimari', 'members' => 400000];
+
+        Http::fake([
+            'api.themoviedb.org/3/genre/*' => Http::response(['genres' => []]),
+            'api.themoviedb.org/3/search/multi*' => Http::response(['results' => []]),
+            'graphql.anilist.co' => Http::response(['error' => 'unavailable'], 503),
+            'api.jikan.moe/v4/anime*' => Http::response(['data' => [$movie, ...$this->jikanPayload()['data']]]),
+        ]);
+
+        $results = $this->service()->search('suzume', MediaType::Film);
+
+        $this->assertSame(['Suzume no Tojimari'], $results->media->pluck('title')->all());
+        $this->assertSame(MediaType::Film, $results->media->first()->media_type);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'jikan.moe') && $request['type'] === 'movie');
     }
 
     public function test_jikan_takes_over_when_anilist_is_down(): void
@@ -263,10 +438,10 @@ class MediaSearchServiceTest extends TestCase
         $this->assertSame(['anilist' => 'jikan'], $results->fallbackSources);
         $this->assertTrue($results->usedFallback());
 
-        $anime = $results->media->firstWhere('media_type', MediaType::Anime);
+        $anime = $results->media->firstWhere('source', MediaSource::Jikan);
 
         $this->assertNotNull($anime);
-        $this->assertSame(MediaSource::Jikan, $anime->source);
+        $this->assertSame(MediaType::Series, $anime->media_type);
         $this->assertSame('52991', $anime->external_id);
         $this->assertContains('Shounen', $anime->genres);
     }
@@ -299,11 +474,13 @@ class MediaSearchServiceTest extends TestCase
     {
         Http::fake([
             // AniList membalas 200 tapi isinya error — tetap harus dianggap gagal.
+            'api.themoviedb.org/3/genre/*' => Http::response(['genres' => []]),
+            'api.themoviedb.org/3/search/multi*' => Http::response(['results' => []]),
             'graphql.anilist.co' => Http::response(['errors' => [['message' => 'Too Many Requests']]]),
             'api.jikan.moe/v4/anime*' => Http::response($this->jikanPayload()),
         ]);
 
-        $results = $this->service()->search('frieren', MediaType::Anime);
+        $results = $this->service()->search('frieren', MediaType::Series);
 
         $this->assertSame([], $results->failedSources);
         $this->assertSame(['anilist' => 'jikan'], $results->fallbackSources);
@@ -339,7 +516,7 @@ class MediaSearchServiceTest extends TestCase
         $results = $this->service()->search('frieren');
 
         $this->assertSame(['tmdb'], $results->skippedSources);
-        $this->assertSame(1, $results->media->count());
+        $this->assertSame(2, $results->media->count());
     }
 
     public function test_queries_shorter_than_two_characters_never_hit_the_network(): void
@@ -368,8 +545,9 @@ class MediaSearchServiceTest extends TestCase
         $this->service()->search('interstellar');
         $this->service()->search('interstellar');
 
-        // Satu request per endpoint saja: genre movie, genre tv, search/multi, anilist.
-        Http::assertSentCount(4);
+        // Satu request per endpoint saja: genre movie, genre tv,
+        // search/multi (id-ID), search/multi (en-US), dan anilist.
+        Http::assertSentCount(5);
     }
 
     public function test_a_failed_search_is_not_cached_for_long(): void

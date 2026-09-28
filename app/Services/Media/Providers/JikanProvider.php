@@ -17,6 +17,8 @@ use Illuminate\Support\Str;
  * Dipakai hanya kalau AniList sedang gagal: endpoint pencarian Jikan cukup
  * sering membalas 504 saat MyAnimeList tidak bisa dihubungi dari sisi mereka,
  * dan batasnya ketat (3 request/detik).
+ *
+ * Seperti AniList: tipe Movie dicatat sebagai Film, sisanya sebagai Series.
  */
 class JikanProvider implements MediaProvider
 {
@@ -32,7 +34,7 @@ class JikanProvider implements MediaProvider
 
     public function supportedTypes(): array
     {
-        return [MediaType::Anime];
+        return [MediaType::Film, MediaType::Series];
     }
 
     public function searchRequests(string $query, array $types, int $limit): array
@@ -40,14 +42,17 @@ class JikanProvider implements MediaProvider
         return [
             'anime' => ProviderRequest::get(
                 url: rtrim((string) config('services.jikan.base_url'), '/').'/anime',
-                query: [
+                query: array_filter([
                     'q' => $query,
+                    // Jikan hanya bisa menyaring satu tipe; permintaan khusus
+                    // Series disaring MediaSearchService setelah parse.
+                    'type' => $types === [MediaType::Film] ? 'movie' : null,
                     // Jikan membatasi limit di 25 per halaman.
                     'limit' => min(max($limit, 1), 25),
                     'order_by' => 'members',
                     'sort' => 'desc',
                     'sfw' => 'true',
-                ],
+                ], fn ($value) => $value !== null),
             ),
         ];
     }
@@ -69,7 +74,7 @@ class JikanProvider implements MediaProvider
 
             $results[] = new MediaResult(
                 source: MediaSource::Jikan,
-                mediaType: MediaType::Anime,
+                mediaType: Arr::get($item, 'type') === 'Movie' ? MediaType::Film : MediaType::Series,
                 externalId: (string) $malId,
                 title: Arr::get($item, 'title_english') ?: $title,
                 originalTitle: Arr::get($item, 'title_japanese') ?: $title,
@@ -83,6 +88,8 @@ class JikanProvider implements MediaProvider
                 genres: $this->collectGenres($item),
                 raw: $item,
                 popularity: (float) Arr::get($item, 'members', 0),
+                // `title` Jikan adalah romaji.
+                originalTitleLatin: $title,
             );
         }
 

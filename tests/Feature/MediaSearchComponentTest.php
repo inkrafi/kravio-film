@@ -103,7 +103,18 @@ class MediaSearchComponentTest extends TestCase
             ->assertSee('Interstellar')
             ->assertSee('Sousou no Frieren')
             ->assertSee('Film')
-            ->assertSee('Anime');
+            ->assertSee('Series');
+    }
+
+    public function test_there_is_no_separate_anime_tab(): void
+    {
+        $this->fakeResults();
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(MediaSearch::class)
+            ->assertSet('tabs', [MediaSearch::ALL => 'Semua', 'film' => 'Film', 'series' => 'Series'])
+            ->call('selectType', 'anime')
+            ->assertSet('type', MediaSearch::ALL);
     }
 
     public function test_the_type_filter_narrows_the_results(): void
@@ -113,8 +124,8 @@ class MediaSearchComponentTest extends TestCase
         Livewire::actingAs(User::factory()->create())
             ->test(MediaSearch::class)
             ->set('query', 'interstellar')
-            ->call('selectType', 'anime')
-            ->assertSet('type', 'anime')
+            ->call('selectType', 'series')
+            ->assertSet('type', 'series')
             ->assertSee('Sousou no Frieren')
             ->assertDontSee('Interstellar');
     }

@@ -2,7 +2,7 @@
     <header class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Cari tontonan</h1>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Film dan series dari TMDB, anime dari MyAnimeList — dalam satu kolom pencarian.
+            Film dan series dari TMDB, termasuk anime dari AniList — dalam satu kolom pencarian.
         </p>
     </header>
 
@@ -123,15 +123,55 @@
                     </p>
                 </div>
             @else
-                <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                    {{ $results->media->count() }} hasil untuk “{{ $query }}”
-                </p>
+                {{-- Orang (aktor, sutradara, …) yang namanya cocok; hanya di tab Semua --}}
+                @if ($results->people)
+                    <section class="mb-8" aria-labelledby="people-heading">
+                        <h2 id="people-heading" class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Orang</h2>
 
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                    @foreach ($results->media as $media)
-                        <x-media-card :media="$media" />
-                    @endforeach
-                </div>
+                        <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ($results->people as $person)
+                                <li wire:key="person-{{ $person['id'] }}">
+                                    <a href="{{ \App\Services\Media\PersonService::url($person['id'], $person['name_latin'] ?? $person['name']) }}" wire:navigate
+                                       class="flex items-center gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-200 transition hover:shadow-md dark:bg-gray-800 dark:ring-gray-700">
+                                        <span class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 text-lg font-semibold text-gray-400 dark:bg-gray-900 dark:text-gray-500">
+                                            @if ($person['photo_url'])
+                                                <img src="{{ $person['photo_url'] }}" alt="" loading="lazy" class="h-full w-full object-cover">
+                                            @else
+                                                <span aria-hidden="true">{{ mb_substr($person['name_latin'] ?? $person['name'], 0, 1) }}</span>
+                                            @endif
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $person['name_latin'] ?? $person['name'] }}</span>
+                                            @if ($person['name_latin'])
+                                                <span class="block truncate text-xs text-gray-400 dark:text-gray-500">{{ $person['name'] }}</span>
+                                            @endif
+                                            @if ($person['department'])
+                                                <span class="block text-xs text-gray-500 dark:text-gray-400">{{ \App\Services\Media\PersonService::departmentLabel($person['department']) }}</span>
+                                            @endif
+                                            @if ($person['known_for'])
+                                                <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ implode(', ', $person['known_for']) }}</span>
+                                            @endif
+                                        </span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
+                @endif
+
+                @if ($results->media->isNotEmpty())
+                    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                        {{ $results->media->count() }} judul untuk “{{ $query }}”
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                        @foreach ($results->media as $media)
+                            <a href="{{ $media->url() }}" wire:navigate wire:key="hit-{{ $media->id }}">
+                                <x-media-card :media="$media" />
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
             @endif
         </div>
     </div>

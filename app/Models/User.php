@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\FriendshipStatus;
+use App\Services\AvatarService;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -51,6 +52,11 @@ class User extends Authenticatable
     public function aiInsights(): HasMany
     {
         return $this->hasMany(AiInsight::class);
+    }
+
+    public function mediaLists(): HasMany
+    {
+        return $this->hasMany(MediaList::class);
     }
 
     /**
@@ -106,7 +112,7 @@ class User extends Authenticatable
 
     public function getAvatarUrlAttribute(): ?string
     {
-        return $this->avatar_path ? Storage::url($this->avatar_path) : null;
+        return $this->avatar_path ? Storage::disk(AvatarService::disk())->url($this->avatar_path) : null;
     }
 
     public function getRouteKeyName(): string

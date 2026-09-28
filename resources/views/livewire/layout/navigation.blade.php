@@ -37,6 +37,20 @@ new class extends Component
                     <x-nav-link :href="route('search')" :active="request()->routeIs('search')" wire:navigate>
                         {{ __('Cari') }}
                     </x-nav-link>
+
+                    <x-nav-link :href="route('friends')" :active="request()->routeIs('friends')" wire:navigate>
+                        {{ __('Teman') }}
+                    </x-nav-link>
+
+                    <x-nav-link :href="route('insight')" :active="request()->routeIs('insight')" wire:navigate>
+                        {{ __('Insight') }}
+                    </x-nav-link>
+
+                    @if (auth()->user()?->username)
+                        <x-nav-link :href="route('profile.show', auth()->user())" :active="request()->routeIs('profile.show')" wire:navigate>
+                            {{ __('Profil Saya') }}
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -92,6 +106,20 @@ new class extends Component
             <x-responsive-nav-link :href="route('search')" :active="request()->routeIs('search')" wire:navigate>
                 {{ __('Cari') }}
             </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('friends')" :active="request()->routeIs('friends')" wire:navigate>
+                {{ __('Teman') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('insight')" :active="request()->routeIs('insight')" wire:navigate>
+                {{ __('Insight') }}
+            </x-responsive-nav-link>
+
+            @if (auth()->user()?->username)
+                <x-responsive-nav-link :href="route('profile.show', auth()->user())" :active="request()->routeIs('profile.show')" wire:navigate>
+                    {{ __('Profil Saya') }}
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->

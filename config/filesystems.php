@@ -16,6 +16,13 @@ return [
     'default' => env('FILESYSTEM_DISK', 'local'),
 
     /*
+    | Disk untuk foto profil. Di hosting dengan filesystem sementara (mis.
+    | Railway), arahkan ke disk S3/R2 supaya foto tidak hilang saat redeploy.
+    */
+
+    'avatar_disk' => env('AVATAR_DISK', 'public'),
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------

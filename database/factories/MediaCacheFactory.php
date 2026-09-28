@@ -45,12 +45,15 @@ class MediaCacheFactory extends Factory
         return $this->state(['media_type' => MediaType::Series, 'source' => MediaSource::Tmdb]);
     }
 
-    public function anime(): static
+    /**
+     * Anime dari AniList: default berepisode (Series), oper Film untuk anime movie.
+     */
+    public function anime(MediaType $type = MediaType::Series): static
     {
         return $this->state(fn () => [
-            'media_type' => MediaType::Anime,
-            'source' => MediaSource::Jikan,
-            'poster_url' => 'https://cdn.myanimelist.net/images/anime/'.fake()->lexify('?????').'.jpg',
+            'media_type' => $type,
+            'source' => MediaSource::Anilist,
+            'poster_url' => 'https://img.anili.st/media/'.fake()->lexify('?????').'.jpg',
             'genres' => fake()->randomElements(['Shounen', 'Isekai', 'Slice of Life', 'Mecha', 'Seinen'], 2),
         ]);
     }

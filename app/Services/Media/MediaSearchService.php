@@ -3,25 +3,30 @@
 namespace App\Services\Media;
 
 use App\Contracts\MediaProvider;
+use App\Contracts\SearchesPeople;
 use App\Enums\MediaType;
 use App\Models\MediaCache;
 use App\Services\Media\Dto\MediaResult;
 use App\Services\Media\Dto\MediaSearchResults;
+use App\Support\PersonNames;
+use App\Support\Romanizer;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Pencarian gabungan film, series, dan anime.
+ * Pencarian gabungan film dan series. Anime tidak punya tipe sendiri: anime
+ * movie masuk Film, anime berepisode masuk Series.
  *
- * Sumber utama ditembak paralel dalam satu pool HTTP. Kalau sebuah media type
- * tidak terlayani karena sumber utamanya mati, sumber cadangan untuk media type
- * itu dijalankan di ronde kedua. Hasilnya dinormalisasi ke satu bentuk,
+ * Sumber utama ditembak paralel dalam satu pool HTTP. Kalau sebuah sumber utama
+ * gagal, sumber cadangannya (mis. Jikan untuk AniList) dijalankan di ronde
+ * kedua. Hasilnya dinormalisasi ke satu bentuk,
  * di-upsert ke media_cache, lalu diurutkan berdasarkan kemiripan judul dan
  * popularitas.
  */
@@ -41,9 +46,19 @@ class MediaSearchService
 
     private const MIN_QUERY_LENGTH = 2;
 
+    /** Jumlah orang yang ditampilkan di atas hasil judul. */
+    public const PEOPLE_LIMIT = 6;
+
+    /**
+     * Orang dengan nama yang tidak mirip kata kunci dibuang, supaya mencari
+     * judul film tidak memunculkan deretan kru yang kebetulan terkait.
+     */
+    private const PEOPLE_MIN_SIMILARITY = 0.6;
+
     /**
      * @param  Collection<int, MediaProvider>  $providers  Sumber utama.
-     * @param  Collection<int, MediaProvider>  $fallbackProviders  Cadangan, hanya dipakai saat sumber utama gagal.
+     * @param  Collection<string, MediaProvider>  $fallbackProviders  Cadangan, di-key dengan key sumber utama yang
+     *                                                                digantikannya; hanya dipakai saat sumber itu gagal.
      */
     public function __construct(
         private readonly Collection $providers,
@@ -83,6 +98,7 @@ class MediaSearchService
             failedSources: $outcome['failed'],
             skippedSources: $outcome['skipped'],
             fallbackSources: $outcome['fallback'],
+            people: $outcome['people'] ?? [],
         );
     }
 
@@ -92,7 +108,7 @@ class MediaSearchService
      * dibaca segar dari database.
      *
      * @param  list<MediaType>  $types
-     * @return array{keys: list<string>, failed: list<string>, skipped: list<string>, fallback: array<string, string>}
+     * @return array{keys: list<string>, failed: list<string>, skipped: list<string>, fallback: array<string, string>, people: list<array<string, mixed>>}
      */
     private function fetchAndStore(string $query, array $types, int $limit): array
     {
@@ -115,45 +131,51 @@ class MediaSearchService
         $failed = $primary['failed'];
         $fallbackUsed = [];
 
-        // Media type yang sama sekali tidak terlayani: semua sumber utamanya gagal.
-        $uncovered = $this->intersectTypes($primary['failedTypes'], $types);
-        $uncovered = array_values(array_filter(
-            $uncovered,
-            fn (MediaType $type) => ! in_array($type, $primary['servedTypes'], strict: true),
-        ));
+        // Sumber utama yang gagal => cadangannya (kalau ada dan siap dipakai).
+        $backups = collect($failed)
+            ->mapWithKeys(fn (string $source) => [$source => $this->fallbackProviders->get($source)])
+            ->filter(fn (?MediaProvider $provider) => $provider?->isConfigured() ?? false);
 
-        if ($uncovered !== []) {
-            $backups = $this->providersFor($this->fallbackProviders, $uncovered)
-                ->filter(fn (MediaProvider $provider) => $provider->isConfigured());
+        if ($backups->isNotEmpty()) {
+            Log::info('Sumber utama gagal, mencoba sumber cadangan.', [
+                'failed' => $backups->keys()->all(),
+                'fallback' => $backups->map(fn (MediaProvider $provider) => $provider->key())->values()->all(),
+            ]);
 
-            if ($backups->isNotEmpty()) {
-                Log::info('Sumber utama gagal, mencoba sumber cadangan.', [
-                    'media_types' => array_map(fn (MediaType $type) => $type->value, $uncovered),
-                    'fallback' => $backups->map(fn (MediaProvider $provider) => $provider->key())->all(),
-                ]);
+            $backup = $this->runProviders($backups->values(), $query, $types, $limit);
 
-                $backup = $this->runProviders($backups, $query, $uncovered, $limit);
+            $results = [...$results, ...$backup['results']];
 
-                $results = [...$results, ...$backup['results']];
-                $failed = [...$failed, ...$backup['failed']];
-
-                [$failed, $fallbackUsed] = $this->creditFallbacks(
-                    $failed,
-                    $primary['failedTypesBySource'],
-                    $backup,
-                );
+            // Sumber utama yang cadangannya berhasil tidak lagi dilaporkan gagal —
+            // cukup dicatat penggantiannya, supaya UI bisa bilang
+            // "AniList bermasalah, hasil diambil dari MyAnimeList".
+            foreach ($backups as $source => $provider) {
+                if (! in_array($provider->key(), $backup['failed'], strict: true)) {
+                    $fallbackUsed[$source] = $provider->key();
+                }
             }
+
+            $failed = [
+                ...array_filter($failed, fn (string $source) => ! array_key_exists($source, $fallbackUsed)),
+                ...$backup['failed'],
+            ];
         }
 
         $ranked = $this->rank(array_values($results), $query, $limit);
 
         $this->store($ranked);
 
+        // Orang hanya di pencarian tanpa filter tipe (tab "Semua").
+        $people = count($types) === count(MediaType::cases())
+            ? $this->rankPeople($primary['people'], $query)
+            : [];
+
         return [
             'keys' => array_map(fn (MediaResult $result) => $result->key(), $ranked),
             'failed' => array_values(array_unique($failed)),
             'skipped' => $skipped,
             'fallback' => $fallbackUsed,
+            'people' => $people,
         ];
     }
 
@@ -162,28 +184,14 @@ class MediaSearchService
      *
      * @param  Collection<int, MediaProvider>  $providers
      * @param  list<MediaType>  $types
-     * @return array{
-     *     results: array<string, MediaResult>,
-     *     failed: list<string>,
-     *     servedTypes: list<MediaType>,
-     *     failedTypes: list<MediaType>,
-     *     failedTypesBySource: array<string, list<MediaType>>,
-     *     servedTypesBySource: array<string, list<MediaType>>
-     * }
+     * @return array{results: array<string, MediaResult>, failed: list<string>, people: array<int, array<string, mixed>>}
      */
     private function runProviders(Collection $providers, string $query, array $types, int $limit): array
     {
-        $empty = [
-            'results' => [],
-            'failed' => [],
-            'servedTypes' => [],
-            'failedTypes' => [],
-            'failedTypesBySource' => [],
-            'servedTypesBySource' => [],
-        ];
+        $outcome = ['results' => [], 'failed' => [], 'people' => []];
 
         if ($providers->isEmpty()) {
-            return $empty;
+            return $outcome;
         }
 
         /** @var array<string, array{provider: MediaProvider, name: string, types: list<MediaType>}> $index */
@@ -218,19 +226,12 @@ class MediaSearchService
             return $requests;
         });
 
-        $outcome = $empty;
-
         foreach ($index as $poolKey => $entry) {
             $provider = $entry['provider'];
             $response = $responses[$poolKey] ?? null;
 
-            $fail = function (string $reason, ?int $status = null) use (&$outcome, $poolKey, $provider, $entry) {
+            $fail = function (string $reason, ?int $status = null) use (&$outcome, $poolKey, $provider) {
                 $outcome['failed'][] = $provider->key();
-                $outcome['failedTypes'] = [...$outcome['failedTypes'], ...$entry['types']];
-                $outcome['failedTypesBySource'][$provider->key()] = array_values(array_unique([
-                    ...($outcome['failedTypesBySource'][$provider->key()] ?? []),
-                    ...$entry['types'],
-                ], SORT_REGULAR));
 
                 Log::warning('Pencarian media gagal.', [
                     'pool_key' => $poolKey,
@@ -250,61 +251,34 @@ class MediaSearchService
 
             try {
                 foreach ($provider->parseSearch($entry['name'], $response) as $result) {
-                    $outcome['results'][$result->key()] = $result;
+                    // Tidak semua API bisa menyaring tipe (mis. /search/multi TMDB,
+                    // atau anime Series di Jikan), jadi saring di sini.
+                    if (! in_array($result->mediaType, $entry['types'], strict: true)) {
+                        continue;
+                    }
+
+                    $key = $result->key();
+
+                    // Request yang lebih awal menang; yang belakangan hanya
+                    // menambal field kosong (mis. sinopsis bahasa cadangan).
+                    $outcome['results'][$key] = isset($outcome['results'][$key])
+                        ? $outcome['results'][$key]->fillGapsFrom($result)
+                        : $result;
                 }
 
-                $outcome['servedTypes'] = [...$outcome['servedTypes'], ...$entry['types']];
-                $outcome['servedTypesBySource'][$provider->key()] = array_values(array_unique([
-                    ...($outcome['servedTypesBySource'][$provider->key()] ?? []),
-                    ...$entry['types'],
-                ], SORT_REGULAR));
+                if ($provider instanceof SearchesPeople) {
+                    foreach ($provider->parsePeople($entry['name'], $response) as $person) {
+                        $outcome['people'][$person['id']] ??= $person;
+                    }
+                }
             } catch (Throwable $e) {
                 $fail($e->getMessage(), $response->status());
             }
         }
 
         $outcome['failed'] = array_values(array_unique($outcome['failed']));
-        $outcome['servedTypes'] = array_values(array_unique($outcome['servedTypes'], SORT_REGULAR));
-        $outcome['failedTypes'] = array_values(array_unique($outcome['failedTypes'], SORT_REGULAR));
 
         return $outcome;
-    }
-
-    /**
-     * Sumber utama yang seluruh media type-nya berhasil diambil sumber cadangan
-     * tidak lagi dilaporkan sebagai gagal — cukup dicatat bahwa ada penggantian,
-     * supaya UI bisa bilang "anime diambil dari AniList".
-     *
-     * @param  list<string>  $failed
-     * @param  array<string, list<MediaType>>  $failedTypesBySource
-     * @param  array{servedTypesBySource: array<string, list<MediaType>>, ...}  $backup
-     * @return array{0: list<string>, 1: array<string, string>}
-     */
-    private function creditFallbacks(array $failed, array $failedTypesBySource, array $backup): array
-    {
-        $rescued = [];
-
-        foreach ($failedTypesBySource as $source => $brokenTypes) {
-            foreach ($backup['servedTypesBySource'] as $backupSource => $servedTypes) {
-                $covered = array_values(array_filter(
-                    $brokenTypes,
-                    fn (MediaType $type) => in_array($type, $servedTypes, strict: true),
-                ));
-
-                if (count($covered) === count($brokenTypes) && $covered !== []) {
-                    $rescued[$source] = $backupSource;
-
-                    break;
-                }
-            }
-        }
-
-        $failed = array_values(array_filter(
-            $failed,
-            fn (string $source) => ! array_key_exists($source, $rescued),
-        ));
-
-        return [$failed, $rescued];
     }
 
     /**
@@ -342,14 +316,58 @@ class MediaSearchService
     }
 
     /**
+     * Kemiripan nama dominan, popularitas sebagai penyeimbang — sama seperti judul.
+     *
+     * @param  array<int, array{name: string, name_latin: ?string, popularity: float}>  $people
+     * @return list<array<string, mixed>>
+     */
+    private function rankPeople(array $people, string $query): array
+    {
+        $ceiling = max(array_column($people, 'popularity') ?: [0]) ?: 1.0;
+        $latinQuery = Romanizer::isLatin($query);
+
+        return collect($people)
+            ->map(function (array $person) use ($query, $latinQuery) {
+                if (! Romanizer::isLatin($person['name'])) {
+                    // Ejaan dari Gemini (lihat PersonNames) lebih tepat daripada romanisasi.
+                    $person['name_latin'] = PersonNames::latinFromCredits($person['id']) ?? $person['name_latin'];
+                }
+
+                $similarity = $this->similarity([$person['name'], $person['name_latin']], $query);
+
+                // Nama non-latin yang muncul untuk kata kunci latin berarti TMDB
+                // mencocokkannya lewat alias (mis. "lee sun kyun" → 이선균); percayai.
+                if ($latinQuery && ! Romanizer::isLatin($person['name'])) {
+                    $similarity = max($similarity, self::PEOPLE_MIN_SIMILARITY);
+                }
+
+                return $person + ['similarity' => $similarity];
+            })
+            ->filter(fn (array $person) => $person['similarity'] >= self::PEOPLE_MIN_SIMILARITY)
+            ->sortByDesc(fn (array $person) => 0.75 * $person['similarity'] + 0.25 * $person['popularity'] / $ceiling)
+            ->take(self::PEOPLE_LIMIT)
+            ->map(fn (array $person) => array_diff_key($person, ['similarity' => true]))
+            ->values()
+            ->all();
+    }
+
+    /**
      * Nilai 0..1, mengambil kecocokan terbaik antara judul utama dan judul asli.
      */
     private function titleSimilarity(MediaResult $result, string $query): float
     {
+        return $this->similarity([$result->title, $result->originalTitle], $query);
+    }
+
+    /**
+     * @param  list<?string>  $candidates
+     */
+    private function similarity(array $candidates, string $query): float
+    {
         $needle = Str::lower($query);
         $best = 0.0;
 
-        foreach (array_filter([$result->title, $result->originalTitle]) as $candidate) {
+        foreach (array_filter($candidates) as $candidate) {
             $haystack = Str::lower($candidate);
 
             if ($haystack === $needle) {
@@ -367,6 +385,23 @@ class MediaSearchService
         }
 
         return $best;
+    }
+
+    /**
+     * Simpan hasil dari luar pencarian (filmografi orang, jelajah genre) ke
+     * media_cache, lalu kembalikan modelnya dengan urutan yang sama — supaya
+     * setiap judul punya slug dan bisa dibuka halaman detailnya.
+     *
+     * @param  list<MediaResult>  $results
+     * @return Collection<int, MediaCache>
+     */
+    public function remember(array $results): Collection
+    {
+        $unique = collect($results)->keyBy(fn (MediaResult $result) => $result->key())->values()->all();
+
+        $this->store($unique);
+
+        return $this->hydrate(array_map(fn (MediaResult $result) => $result->key(), $unique));
     }
 
     /**
@@ -395,7 +430,33 @@ class MediaSearchService
             [
                 'title', 'original_title', 'poster_url', 'backdrop_url', 'synopsis',
                 'year', 'released_on', 'genres', 'raw_payload', 'synced_at', 'updated_at',
+                // Versi latin dari sumber (judul en-US TMDB, romaji) boleh
+                // menggantikan yang lama, tapi kosong tidak boleh menghapusnya.
+                'title_latin' => DB::raw('COALESCE(excluded.title_latin, media_cache.title_latin)'),
+                'original_title_latin' => DB::raw('COALESCE(excluded.original_title_latin, media_cache.original_title_latin)'),
             ],
+        );
+
+        // Romanisasi cadangan hanya mengisi yang masih kosong, supaya tidak
+        // menimpa judul resmi atau hasil Gemini (MediaLocalizationService).
+        foreach ($results as $result) {
+            $fromSource = $result->latinColumns(withFallback: false);
+
+            foreach ($result->latinColumns() as $column => $value) {
+                if ($value !== null && $fromSource[$column] === null) {
+                    MediaCache::query()
+                        ->where('source', $result->source->value)
+                        ->where('media_type', $result->mediaType->value)
+                        ->where('external_id', $result->externalId)
+                        ->whereNull($column)
+                        ->update([$column => $value]);
+                }
+            }
+        }
+
+        // Upsert tidak memicu event model, jadi judul baru diberi slug di sini.
+        MediaCache::query()->whereNull('slug')->orderBy('id')->each(
+            fn (MediaCache $media) => $media->assignSlug(),
         );
     }
 

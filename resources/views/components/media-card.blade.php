@@ -2,7 +2,6 @@
 
 <article
     {{ $attributes->merge(['class' => 'group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 transition hover:shadow-md dark:bg-gray-800 dark:ring-gray-700']) }}
-    wire:key="media-{{ $media->id }}"
 >
     <div class="relative aspect-[2/3] w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
         @if ($media->poster_url)
@@ -28,10 +27,14 @@
             {{ $media->title }}
         </h3>
 
+        @if ($media->title_latin)
+            <p class="line-clamp-1 text-xs text-gray-600 dark:text-gray-300" title="{{ $media->title_latin }}">{{ $media->title_latin }}</p>
+        @endif
+
         <p class="text-xs text-gray-500 dark:text-gray-400">
             {{ $media->year ?? 'Tahun tidak diketahui' }}
-            @if ($media->genres)
-                · {{ implode(', ', array_slice($media->genres, 0, 2)) }}
+            @if ($media->displayGenres())
+                · {{ implode(', ', array_slice($media->displayGenres(), 0, 2)) }}
             @endif
         </p>
     </div>

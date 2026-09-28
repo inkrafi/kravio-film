@@ -44,6 +44,11 @@ return [
         'include_adult' => env('TMDB_INCLUDE_ADULT', false),
     ],
 
+    'omdb' => [
+        'key' => env('OMDB_API_KEY'),
+        'base_url' => env('OMDB_BASE_URL', 'https://www.omdbapi.com/'),
+    ],
+
     'jikan' => [
         'base_url' => env('JIKAN_BASE_URL', 'https://api.jikan.moe/v4'),
     ],
@@ -54,7 +59,13 @@ return [
 
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+        // Model ringan sebagai default supaya kuota gratis awet.
+        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        // Terjemahan & romanisasi (banyak permintaan, sederhana).
+        'translation_model' => env('GEMINI_TRANSLATION_MODEL', 'gemini-3.1-flash-lite'),
+        // Dipakai sekali kalau kuota harian model yang diminta habis. Harus model
+        // lain, karena kuota gratis dihitung per model per hari.
+        'fallback_model' => env('GEMINI_FALLBACK_MODEL', 'gemini-3.8-flash'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
     ],
 

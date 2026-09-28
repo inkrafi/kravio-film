@@ -29,6 +29,9 @@ class UserFactory extends Factory
             'username' => Str::lower(Str::slug(fake()->unique()->userName(), '_')).'_'.fake()->numberBetween(100, 999),
             'email' => fake()->unique()->safeEmail(),
             'bio' => fake()->optional()->sentence(12),
+            // Model::shouldBeStrict() menolak atribut yang tidak ada di instance,
+            // jadi factory harus menghasilkan baris yang lengkap.
+            'avatar_path' => null,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),

@@ -11,11 +11,11 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Search gabungan: satu kolom pencarian, hasil film/series/anime bercampur,
- * bisa dipersempit lewat tab filter.
+ * Search gabungan: satu kolom pencarian, hasil film/series bercampur (anime
+ * ikut masuk Film atau Series), bisa dipersempit lewat tab filter.
  */
 #[Layout('layouts.app')]
-#[Title('Cari Film, Series & Anime')]
+#[Title('Cari Film & Series')]
 class MediaSearch extends Component
 {
     public const ALL = 'semua';

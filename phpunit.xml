@@ -35,5 +35,11 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="TMDB_API_KEY" value="testing-key"/>
         <env name="TMDB_LANGUAGE" value="id-ID"/>
+        <!-- Kunci asli di .env tidak boleh ikut terpakai saat test; test yang butuh mengisinya sendiri. -->
+        <env name="OMDB_API_KEY" value=""/>
+        <env name="GEMINI_API_KEY" value=""/>
+        <env name="GEMINI_MODEL" value="gemini-3.1-flash-lite"/>
+        <env name="GEMINI_TRANSLATION_MODEL" value="gemini-3.1-flash-lite"/>
+        <env name="GEMINI_FALLBACK_MODEL" value="gemini-3.8-flash"/>
     </php>
 </phpunit>

@@ -3,14 +3,19 @@
 namespace App\Models;
 
 use App\Enums\WatchStatus;
+use Database\Factories\WatchEntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['user_id', 'media_cache_id', 'status', 'rating', 'watched_at'])]
 class WatchEntry extends Model
 {
+    /** @use HasFactory<WatchEntryFactory> */
+    use HasFactory;
+
     protected function casts(): array
     {
         return [
