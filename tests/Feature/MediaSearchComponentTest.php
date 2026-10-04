@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\MediaSearch;
+use App\Livewire\PopularTitles;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -90,7 +91,113 @@ class MediaSearchComponentTest extends TestCase
             ->get(route('search'))
             ->assertOk()
             ->assertSeeLivewire(MediaSearch::class)
-            ->assertSee('Mulai ketik untuk mencari');
+            ->assertSee('Sedang populer minggu ini');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tmdbTrending(): array
+    {
+        return ['results' => [
+            ['id' => 157336, 'media_type' => 'movie', 'title' => 'Interstellar', 'poster_path' => '/i.jpg', 'release_date' => '2014-11-05', 'genre_ids' => [18]],
+            ['id' => 1396, 'media_type' => 'tv', 'name' => 'Breaking Bad', 'poster_path' => '/bb.jpg', 'first_air_date' => '2008-01-20', 'genre_ids' => [18]],
+            ['id' => 525, 'media_type' => 'person', 'name' => 'Christopher Nolan'],
+        ]];
+    }
+
+    private function popular(?string $type = null)
+    {
+        return Livewire::withoutLazyLoading()
+            ->actingAs(User::factory()->create())
+            ->test(PopularTitles::class, ['type' => $type]);
+    }
+
+    public function test_the_search_page_loads_popular_titles_lazily_without_calling_any_api(): void
+    {
+        Http::fake();
+
+        // Daftar populer di komponen terpisah yang dimuat belakangan, jadi
+        // render awal dan ketikan pencarian tidak pernah menunggu TMDB/AniList.
+        Livewire::actingAs(User::factory()->create())
+            ->test(MediaSearch::class)
+            ->assertSeeLivewire(PopularTitles::class)
+            ->assertSee('Memuat judul populer');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_popular_titles_mix_tmdb_and_anime_and_are_cached(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/genre/*' => Http::response(['genres' => [['id' => 18, 'name' => 'Drama']]]),
+            'api.themoviedb.org/3/trending/all/week*' => Http::response($this->tmdbTrending()),
+            'graphql.anilist.co' => Http::response($this->anilistPayload()),
+        ]);
+
+        $this->popular()
+            ->assertSee('Sedang populer minggu ini')
+            ->assertSeeInOrder(['Interstellar', 'Breaking Bad', 'Sousou no Frieren'])
+            ->assertDontSee('Christopher Nolan');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'graphql.anilist.co')
+            && str_contains($request['query'], 'TRENDING_DESC'));
+
+        // Kunjungan berikutnya memakai cache, tanpa request baru.
+        $sent = count(Http::recorded());
+
+        $this->popular()->assertSee('Interstellar');
+
+        $this->assertCount($sent, Http::recorded());
+    }
+
+    public function test_popular_titles_follow_the_type_tab(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/genre/*' => Http::response(['genres' => []]),
+            'api.themoviedb.org/3/trending/tv/week*' => Http::response(['results' => [
+                ['id' => 1396, 'name' => 'Breaking Bad', 'poster_path' => '/bb.jpg', 'first_air_date' => '2008-01-20', 'genre_ids' => []],
+            ]]),
+            'graphql.anilist.co' => Http::response($this->anilistPayload()),
+        ]);
+
+        $this->popular('series')->assertSee('Breaking Bad');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'graphql.anilist.co')
+            && ($request['variables']['formatNotIn'] ?? null) === ['MOVIE']);
+    }
+
+    public function test_a_failing_source_still_shows_the_rest_and_is_only_cached_briefly(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/genre/*' => Http::response(['genres' => []]),
+            'api.themoviedb.org/3/trending/all/week*' => Http::response($this->tmdbTrending()),
+            'graphql.anilist.co' => Http::response([], 500),
+        ]);
+
+        $this->popular()
+            ->assertSee('Interstellar')
+            ->assertSee('daftarnya belum lengkap');
+
+        // Sumber yang down tidak ditunggu lagi di kunjungan berikutnya...
+        $this->assertTrue(cache()->has('trending:semua:id-ID'));
+
+        // ...tapi dicoba lagi setelah 10 menit.
+        $this->travel(11)->minutes();
+        $this->assertFalse(cache()->has('trending:semua:id-ID'));
+    }
+
+    public function test_a_down_source_is_tried_only_once(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/*' => Http::response([], 500),
+            'graphql.anilist.co' => Http::response([], 500),
+        ]);
+
+        $this->popular()->assertSee('Mulai ketik untuk mencari');
+
+        // Satu percobaan per sumber, tanpa retry.
+        Http::assertSentCount(2);
     }
 
     public function test_typing_a_query_shows_mixed_results(): void
@@ -161,7 +268,7 @@ class MediaSearchComponentTest extends TestCase
             ->call('clear')
             ->assertSet('query', '')
             ->assertSet('type', MediaSearch::ALL)
-            ->assertSee('Mulai ketik untuk mencari');
+            ->assertSee('Sedang populer minggu ini');
     }
 
     public function test_the_query_is_kept_in_the_url(): void

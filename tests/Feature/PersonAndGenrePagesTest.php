@@ -222,6 +222,7 @@ class PersonAndGenrePagesTest extends TestCase
                     ['id' => null, 'name' => 'Tanpa ID', 'role' => null, 'photo_url' => null],
                 ],
             ],
+            'watch_providers' => ['region' => 'ID', 'link' => null, 'providers' => []],
             'details_synced_at' => now(),
         ]);
 

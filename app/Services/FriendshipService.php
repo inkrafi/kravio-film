@@ -6,6 +6,8 @@ use App\Enums\FriendshipState;
 use App\Enums\FriendshipStatus;
 use App\Models\Friendship;
 use App\Models\User;
+use App\Notifications\FriendRequestAccepted;
+use App\Notifications\FriendRequestReceived;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
@@ -41,11 +43,15 @@ class FriendshipService
             ]);
         }
 
-        return Friendship::create([
+        $friendship = Friendship::create([
             'user_id' => $from->id,
             'friend_id' => $to->id,
             'status' => FriendshipStatus::Pending,
         ]);
+
+        $to->notify(new FriendRequestReceived($from));
+
+        return $friendship;
     }
 
     /**
@@ -63,6 +69,10 @@ class FriendshipService
             'status' => FriendshipStatus::Accepted,
             'accepted_at' => now(),
         ]);
+
+        $this->forgetRequestNotification($friendship);
+
+        User::find($friendship->user_id)?->notify(new FriendRequestAccepted($actor));
     }
 
     /**
@@ -77,6 +87,7 @@ class FriendshipService
         }
 
         $friendship->delete();
+        $this->forgetRequestNotification($friendship);
     }
 
     /**
@@ -91,6 +102,19 @@ class FriendshipService
         }
 
         $friendship->delete();
+        $this->forgetRequestNotification($friendship);
+    }
+
+    /**
+     * Permintaan yang sudah dijawab atau dibatalkan tidak perlu lagi ada di
+     * lonceng penerimanya.
+     */
+    private function forgetRequestNotification(Friendship $friendship): void
+    {
+        User::find($friendship->friend_id)?->notifications()
+            ->where('type', FriendRequestReceived::class)
+            ->where('data->actor_id', $friendship->user_id)
+            ->delete();
     }
 
     /**

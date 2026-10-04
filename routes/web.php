@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Dashboard;
 use App\Livewire\Friends;
 use App\Livewire\GenreBrowse;
 use App\Livewire\InsightPage;
@@ -39,7 +40,8 @@ Route::middleware('auth')->group(function () {
 
     Route::view('profile', 'profile')->name('profile');
 
-    Route::view('dashboard', 'dashboard')
+    // Beranda: aktivitas teman, watchlist, dan rekomendasi.
+    Route::get('dashboard', Dashboard::class)
         ->middleware('verified')
         ->name('dashboard');
 

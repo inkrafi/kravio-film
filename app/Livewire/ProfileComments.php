@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Models\ProfileComment;
 use App\Models\User;
+use App\Notifications\ProfileCommentPosted;
+use App\Notifications\ProfileCommentReplied;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -92,10 +94,14 @@ class ProfileComments extends Component
             return;
         }
 
-        $this->user->profileComments()->create([
+        $comment = $this->user->profileComments()->create([
             'commenter_id' => Auth::id(),
             'body' => trim($this->body),
         ]);
+
+        if ($this->user->id !== Auth::id()) {
+            $this->user->notify(new ProfileCommentPosted($comment));
+        }
 
         $this->reset('body');
     }
@@ -136,11 +142,18 @@ class ProfileComments extends Component
             return;
         }
 
-        $this->user->profileComments()->create([
+        $reply = $this->user->profileComments()->create([
             'commenter_id' => Auth::id(),
             'parent_id' => $parent->id,
             'body' => trim($this->replyBody),
         ]);
+
+        // Pemilik profil dan penulis komentar induk, kecuali yang membalas sendiri.
+        User::query()
+            ->whereIn('id', [$this->user->id, $parent->commenter_id])
+            ->whereKeyNot(Auth::id())
+            ->get()
+            ->each(fn (User $recipient) => $recipient->notify(new ProfileCommentReplied($reply)));
 
         $this->reset('replyingTo', 'replyBody');
     }

@@ -108,6 +108,19 @@
                 @endif
             </div>
 
+            {{-- Rating gabungan pengguna Kravio --}}
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                @if ($community['average'] !== null)
+                    <span class="font-semibold text-amber-600 dark:text-amber-400">★ {{ number_format($community['average'], 1, ',', '.') }}</span><span class="text-xs text-gray-400">/10</span>
+                    di Kravio · {{ $community['ratings'] }} rating
+                @else
+                    Belum ada rating di Kravio
+                @endif
+                @if ($community['watched'] > 0)
+                    · {{ $community['watched'] }} orang sudah menonton
+                @endif
+            </p>
+
             @if ($media->displayGenres())
                 <div class="mt-3 flex flex-wrap gap-1.5">
                     @foreach ($media->displayGenres() as $genre)
@@ -173,6 +186,52 @@
                         @endforeach
                     </dl>
                 @endif
+            @endif
+
+            {{-- Tempat menonton: streaming, gratis, sewa, beli (JustWatch lewat TMDB) --}}
+            @if ($detailsPending)
+                <div class="mt-4 flex gap-1.5">
+                    <div class="h-8 w-8 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                    <div class="h-8 w-8 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                    <div class="h-8 w-8 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                </div>
+            @elseif (filled($media->watch_providers['region'] ?? null))
+                @php
+                    $typeLabels = ['flatrate' => 'Streaming', 'free' => 'Gratis', 'ads' => 'Gratis (iklan)', 'rent' => 'Sewa', 'buy' => 'Beli'];
+                    $groups = collect($typeLabels)
+                        ->map(fn ($label, $type) => array_values(array_filter($media->watchProviders(), fn ($provider) => in_array($type, $provider['types'], true))))
+                        ->filter();
+                @endphp
+
+                <div class="mt-4">
+                    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Tonton di</h2>
+
+                    @if ($groups->isEmpty())
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Belum tersedia di platform streaming mana pun di Indonesia.</p>
+                    @else
+                        <dl class="mt-2 space-y-2 text-sm">
+                            @foreach ($groups as $type => $providers)
+                                <div class="flex items-center gap-2">
+                                    <dt class="w-20 shrink-0 text-gray-500 dark:text-gray-400">{{ $typeLabels[$type] }}</dt>
+                                    <dd class="flex flex-wrap gap-1.5">
+                                        @foreach ($providers as $provider)
+                                            <a href="{{ $media->watch_providers['link'] ?? '#' }}" target="_blank" rel="noopener" title="{{ $provider['name'] }}"
+                                               class="block overflow-hidden rounded-lg ring-1 ring-gray-200 transition hover:ring-indigo-400 dark:ring-gray-700">
+                                                @if ($provider['logo_url'])
+                                                    <img src="{{ $provider['logo_url'] }}" alt="{{ $provider['name'] }}" class="h-8 w-8 object-cover" loading="lazy">
+                                                @else
+                                                    <span class="flex h-8 items-center px-2 text-xs text-gray-700 dark:text-gray-200">{{ $provider['name'] }}</span>
+                                                @endif
+                                            </a>
+                                        @endforeach
+                                    </dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    @endif
+
+                    <p class="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">Data ketersediaan dari JustWatch</p>
+                </div>
             @endif
 
             {{-- Tombol watched / watchlist --}}
@@ -301,6 +360,59 @@
                     </button>
                 @endif
             </div>
+
+            {{-- Teman yang sudah menonton atau menyimpan judul ini --}}
+            <section class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700" aria-labelledby="friends-heading">
+                <h2 id="friends-heading" class="text-sm font-semibold text-gray-900 dark:text-gray-100">Teman</h2>
+
+                @if ($friendEntries->isEmpty())
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Belum ada teman yang menonton atau menyimpan judul ini.</p>
+                @else
+                    <ul class="mt-3 space-y-4">
+                        @foreach ($friendEntries as $entry)
+                            @php $friendReview = $friendReviews->get($entry->user_id); @endphp
+
+                            <li wire:key="friend-entry-{{ $entry->id }}" class="flex gap-3">
+                                <x-avatar :user="$entry->user" size="h-8 w-8 text-xs" />
+
+                                <div class="min-w-0 flex-1 text-sm">
+                                    <p class="text-gray-700 dark:text-gray-300">
+                                        @if ($entry->user->username)
+                                            <a href="{{ route('profile.show', $entry->user) }}" wire:navigate class="font-semibold text-gray-900 hover:underline dark:text-gray-100">{{ $entry->user->name }}</a>
+                                        @else
+                                            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ $entry->user->name }}</span>
+                                        @endif
+
+                                        @if ($entry->status === WatchStatus::Watched)
+                                            @if ($entry->rating)
+                                                <span class="ms-1 font-semibold text-amber-600 dark:text-amber-400">★ {{ $entry->rating }}</span><span class="text-xs text-gray-400">/10</span>
+                                            @else
+                                                <span class="text-gray-500 dark:text-gray-400">sudah menonton</span>
+                                            @endif
+                                            @if ($entry->watched_at)
+                                                <span class="text-xs text-gray-400 dark:text-gray-500">· {{ $entry->watched_at->locale('id')->diffForHumans() }}</span>
+                                            @endif
+                                        @else
+                                            <span class="text-gray-500 dark:text-gray-400">ingin menonton</span>
+                                        @endif
+                                    </p>
+
+                                    @if ($friendReview)
+                                        @if ($friendReview->contains_spoiler)
+                                            <details class="mt-1 text-gray-600 dark:text-gray-400">
+                                                <summary class="cursor-pointer text-xs text-rose-600 dark:text-rose-400">Review mengandung spoiler, tampilkan</summary>
+                                                <p class="mt-1 whitespace-pre-line leading-relaxed">{{ $friendReview->body }}</p>
+                                            </details>
+                                        @else
+                                            <p class="mt-1 whitespace-pre-line leading-relaxed text-gray-600 dark:text-gray-400">{{ $friendReview->body }}</p>
+                                        @endif
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </section>
         </div>
     </div>
 

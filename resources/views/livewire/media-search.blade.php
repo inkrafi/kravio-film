@@ -105,13 +105,8 @@
 
         <div wire:loading.remove.delay wire:target="query, type, selectType">
             @if (! $this->hasQuery)
-                {{-- State awal --}}
-                <div class="rounded-lg border border-dashed border-gray-300 px-6 py-16 text-center dark:border-gray-700">
-                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Mulai ketik untuk mencari</p>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Minimal {{ $minQueryLength }} huruf. Coba “Interstellar”, “Breaking Bad”, atau “Frieren”.
-                    </p>
-                </div>
+                {{-- State awal: judul yang sedang populer (komponen lazy terpisah) --}}
+                <livewire:popular-titles :type="$type === \App\Livewire\MediaSearch::ALL ? null : $type" key="popular-titles" />
             @elseif ($results->isEmpty())
                 {{-- State kosong --}}
                 <div class="rounded-lg border border-dashed border-gray-300 px-6 py-16 text-center dark:border-gray-700">

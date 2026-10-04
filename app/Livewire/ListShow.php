@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\MediaList;
 use App\Models\MediaListComment;
+use App\Notifications\ListCommented;
 use App\Services\MediaListService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -94,7 +95,11 @@ class ListShow extends Component
 
         RateLimiter::hit($key, 60);
 
-        $this->mediaList->comments()->create(['user_id' => Auth::id(), 'body' => trim($this->commentBody)]);
+        $comment = $this->mediaList->comments()->create(['user_id' => Auth::id(), 'body' => trim($this->commentBody)]);
+
+        if ($this->mediaList->user_id !== Auth::id()) {
+            $this->mediaList->user->notify(new ListCommented($comment));
+        }
 
         $this->reset('commentBody');
     }

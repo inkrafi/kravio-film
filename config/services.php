@@ -42,6 +42,8 @@ return [
         'poster_size' => env('TMDB_POSTER_SIZE', 'w342'),
         'language' => env('TMDB_LANGUAGE', 'id-ID'),
         'include_adult' => env('TMDB_INCLUDE_ADULT', false),
+        // Negara (ISO 3166-1) untuk daftar platform tonton dari JustWatch.
+        'watch_region' => env('TMDB_WATCH_REGION', 'ID'),
     ],
 
     'omdb' => [

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\WatchStatus;
 use App\Livewire\MediaDetail;
 use App\Models\Favorite;
+use App\Models\Friendship;
 use App\Models\MediaCache;
 use App\Models\Review;
 use App\Models\User;
@@ -356,5 +357,64 @@ class MediaDetailTest extends TestCase
         $this->detail()
             ->assertSet('status', null)
             ->assertSet('rating', null);
+    }
+
+    public function test_it_shows_the_average_rating_of_all_kravio_users(): void
+    {
+        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 8]);
+        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 9]);
+        WatchEntry::factory()->unrated()->create(['media_cache_id' => $this->media->id]);
+        // Watchlist tidak dihitung.
+        WatchEntry::factory()->watchlist()->create(['media_cache_id' => $this->media->id]);
+
+        $this->detail()
+            ->assertSee('★ 8,5')
+            ->assertSee('2 rating')
+            ->assertSee('3 orang sudah menonton');
+    }
+
+    public function test_titles_without_ratings_say_so(): void
+    {
+        $this->detail()->assertSee('Belum ada rating di Kravio');
+    }
+
+    public function test_it_shows_friends_ratings_and_reviews_but_not_strangers(): void
+    {
+        $friend = User::factory()->create(['name' => 'Teman Akrab']);
+        $planner = User::factory()->create(['name' => 'Teman Rencana']);
+        $stranger = User::factory()->create(['name' => 'Orang Asing']);
+
+        Friendship::factory()->accepted()->create(['user_id' => $friend->id, 'friend_id' => $this->user->id]);
+        Friendship::factory()->accepted()->create(['user_id' => $this->user->id, 'friend_id' => $planner->id]);
+
+        WatchEntry::factory()->for($friend)->create(['media_cache_id' => $this->media->id, 'rating' => 7]);
+        Review::factory()->for($friend)->create(['media_cache_id' => $this->media->id, 'body' => 'Endingnya bikin nangis']);
+        WatchEntry::factory()->for($planner)->watchlist()->create(['media_cache_id' => $this->media->id]);
+
+        WatchEntry::factory()->for($stranger)->create(['media_cache_id' => $this->media->id]);
+        Review::factory()->for($stranger)->create(['media_cache_id' => $this->media->id, 'body' => 'Review orang asing']);
+
+        $this->detail()
+            ->assertSeeInOrder(['Teman Akrab', '★ 7', 'Endingnya bikin nangis', 'Teman Rencana', 'ingin menonton'])
+            ->assertDontSee('Orang Asing')
+            ->assertDontSee('Review orang asing');
+    }
+
+    public function test_friend_spoiler_reviews_are_folded(): void
+    {
+        $friend = User::factory()->create();
+        Friendship::factory()->accepted()->create(['user_id' => $this->user->id, 'friend_id' => $friend->id]);
+
+        WatchEntry::factory()->for($friend)->create(['media_cache_id' => $this->media->id]);
+        Review::factory()->for($friend)->create(['media_cache_id' => $this->media->id, 'contains_spoiler' => true]);
+
+        $this->detail()
+            ->assertSeeHtml('<details')
+            ->assertSee('Review mengandung spoiler, tampilkan');
+    }
+
+    public function test_it_says_when_no_friend_has_logged_the_title(): void
+    {
+        $this->detail()->assertSee('Belum ada teman yang menonton atau menyimpan judul ini.');
     }
 }

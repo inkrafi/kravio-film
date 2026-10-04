@@ -20,7 +20,7 @@ class MediaSearch extends Component
 {
     public const ALL = 'semua';
 
-    private const MIN_QUERY_LENGTH = 2;
+    public const MIN_QUERY_LENGTH = 2;
 
     private const LIMIT = 24;
 

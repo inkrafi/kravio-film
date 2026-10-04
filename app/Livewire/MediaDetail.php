@@ -8,8 +8,10 @@ use App\Models\Favorite;
 use App\Models\MediaCache;
 use App\Models\Review;
 use App\Models\WatchEntry;
+use App\Services\FriendshipService;
 use App\Services\Media\MediaDetailsService;
 use App\Services\Media\MediaLocalizationService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -48,10 +50,15 @@ class MediaDetail extends Component
         $this->syncFromDatabase();
     }
 
-    public function render()
+    public function render(FriendshipService $friendships)
     {
+        $friendEntries = $this->friendEntries($friendships->friendIdsOf(Auth::user()));
+
         return view('livewire.media-detail', [
             'review' => $this->currentReview(),
+            'community' => $this->communityRating(),
+            'friendEntries' => $friendEntries,
+            'friendReviews' => $this->friendReviews($friendEntries),
             'favoriteCount' => Favorite::where('user_id', Auth::id())->count(),
             'maxFavorites' => Favorite::MAX_PER_USER,
             'detailsPending' => ! $this->detailsChecked && $this->detailsNeedRefresh(),
@@ -71,6 +78,67 @@ class MediaDetail extends Component
         // Setelah credits ada, supaya nama pemain & sutradara ikut dilatinkan.
         $this->media = $localization->localize($this->media);
         $this->detailsChecked = true;
+    }
+
+    /**
+     * Rata-rata rating semua pengguna Kravio. Hanya angka gabungan, jadi tidak
+     * membuka pustaka siapa pun yang bukan teman.
+     *
+     * @return array{average: ?float, ratings: int, watched: int}
+     */
+    private function communityRating(): array
+    {
+        $watched = WatchEntry::query()->where('media_cache_id', $this->media->id)->watched();
+
+        return [
+            'average' => ($average = (clone $watched)->avg('rating')) !== null ? round((float) $average, 1) : null,
+            'ratings' => (clone $watched)->whereNotNull('rating')->count(),
+            'watched' => $watched->count(),
+        ];
+    }
+
+    /**
+     * Catatan teman untuk judul ini: yang sudah menonton dulu, lalu yang
+     * baru menyimpannya di watchlist.
+     *
+     * @param  list<int>  $friendIds
+     * @return Collection<int, WatchEntry>
+     */
+    private function friendEntries(array $friendIds): Collection
+    {
+        if ($friendIds === []) {
+            return collect();
+        }
+
+        return WatchEntry::query()
+            ->where('media_cache_id', $this->media->id)
+            ->whereIn('user_id', $friendIds)
+            ->with('user')
+            ->get()
+            ->sortBy([
+                fn (WatchEntry $a, WatchEntry $b) => ($a->status === WatchStatus::Watched ? 0 : 1) <=> ($b->status === WatchStatus::Watched ? 0 : 1),
+                fn (WatchEntry $a, WatchEntry $b) => $b->watched_at?->timestamp <=> $a->watched_at?->timestamp,
+            ])
+            ->values();
+    }
+
+    /**
+     * Review teman yang sudah menonton, dikunci per user_id.
+     *
+     * @param  Collection<int, WatchEntry>  $friendEntries
+     * @return Collection<int, Review>
+     */
+    private function friendReviews(Collection $friendEntries): Collection
+    {
+        if ($friendEntries->isEmpty()) {
+            return collect();
+        }
+
+        return Review::query()
+            ->where('media_cache_id', $this->media->id)
+            ->whereIn('user_id', $friendEntries->pluck('user_id'))
+            ->get()
+            ->keyBy('user_id');
     }
 
     private function detailsNeedRefresh(): bool

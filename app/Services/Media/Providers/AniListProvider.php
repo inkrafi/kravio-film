@@ -70,6 +70,26 @@ class AniListProvider implements MediaProvider
         }
         GRAPHQL;
 
+    private const TRENDING_QUERY = <<<'GRAPHQL'
+        query ($perPage: Int, $formatIn: [MediaFormat], $formatNotIn: [MediaFormat]) {
+          Page(page: 1, perPage: $perPage) {
+            media(type: ANIME, format_in: $formatIn, format_not_in: $formatNotIn, sort: TRENDING_DESC, isAdult: false) {
+              id
+              title { romaji english native }
+              description(asHtml: false)
+              coverImage { extraLarge large }
+              bannerImage
+              startDate { year month day }
+              seasonYear
+              format
+              genres
+              tags { name rank isGeneralSpoiler }
+              popularity
+            }
+          }
+        }
+        GRAPHQL;
+
     public function key(): string
     {
         return MediaSource::Anilist->value;
@@ -138,6 +158,35 @@ class AniListProvider implements MediaProvider
             'results' => $this->parseSearch('browse', $response),
             'has_more' => (bool) Arr::get($response->json(), 'data.Page.pageInfo.hasNextPage', false),
         ];
+    }
+
+    /**
+     * Anime yang sedang ramai dibicarakan di AniList. Film => format MOVIE,
+     * Series => format lain, tanpa tipe => semuanya.
+     *
+     * @return list<MediaResult>
+     *
+     * @throws RuntimeException kalau AniList gagal dihubungi atau menolak query.
+     */
+    public function trending(?MediaType $type, int $perPage): array
+    {
+        $response = Http::timeout(5)->retry(1, 0, throw: false)->acceptJson()->post(
+            (string) config('services.anilist.base_url'),
+            [
+                'query' => self::TRENDING_QUERY,
+                'variables' => self::variables([
+                    'perPage' => $perPage,
+                    'formatIn' => $type === MediaType::Film ? [self::MOVIE_FORMAT] : null,
+                    'formatNotIn' => $type === MediaType::Series ? [self::MOVIE_FORMAT] : null,
+                ]),
+            ],
+        );
+
+        if ($response->failed()) {
+            throw new RuntimeException("AniList membalas {$response->status()}.");
+        }
+
+        return $this->parseSearch('trending', $response);
     }
 
     /**

@@ -130,7 +130,7 @@ class MediaDetailsServiceTest extends TestCase
 
         // Satu request TMDB untuk semuanya, lalu OMDb lewat IMDb ID.
         Http::assertSent(fn ($request) => str_contains($request->url(), 'movie/157336')
-            && $request['append_to_response'] === 'credits,external_ids');
+            && $request['append_to_response'] === 'credits,external_ids,watch/providers');
         Http::assertSent(fn ($request) => str_contains($request->url(), 'omdbapi.com') && $request['i'] === 'tt0816692');
     }
 
@@ -167,7 +167,7 @@ class MediaDetailsServiceTest extends TestCase
         $this->assertNull($media->rotten_tomatoes_score);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'tv/1396')
-            && $request['append_to_response'] === 'aggregate_credits,external_ids');
+            && $request['append_to_response'] === 'aggregate_credits,external_ids,watch/providers');
     }
 
     public function test_anime_is_linked_to_tmdb_through_its_imdb_id(): void
@@ -365,6 +365,63 @@ class MediaDetailsServiceTest extends TestCase
             ->assertSee('https://www.imdb.com/title/tt0816692/');
     }
 
+    public function test_watch_providers_for_the_configured_region_are_shown_on_the_detail_page(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/movie/*' => Http::response($this->tmdbMovie() + [
+                'watch/providers' => ['results' => [
+                    'ID' => [
+                        'link' => 'https://www.themoviedb.org/movie/157336/watch?locale=ID',
+                        'flatrate' => [['provider_id' => 8, 'provider_name' => 'Netflix', 'logo_path' => '/netflix.jpg', 'display_priority' => 1]],
+                        'rent' => [
+                            ['provider_id' => 3, 'provider_name' => 'Google Play Movies', 'logo_path' => '/gp.jpg', 'display_priority' => 5],
+                            ['provider_id' => 2, 'provider_name' => 'Apple TV', 'logo_path' => '/apple.jpg', 'display_priority' => 2],
+                        ],
+                        'buy' => [['provider_id' => 3, 'provider_name' => 'Google Play Movies', 'logo_path' => '/gp.jpg', 'display_priority' => 5]],
+                    ],
+                    'US' => ['flatrate' => [['provider_id' => 9, 'provider_name' => 'Prime Video', 'logo_path' => '/prime.jpg']]],
+                ]],
+            ]),
+            'www.omdbapi.com/*' => Http::response($this->omdbPayload()),
+        ]);
+
+        $media = MediaCache::factory()->film()->create();
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(MediaDetail::class, ['media' => $media])
+            ->call('loadDetails')
+            ->assertSee('Tonton di')
+            ->assertSee('Streaming')
+            ->assertSee('Netflix')
+            ->assertSee('Sewa')
+            ->assertSee('Beli')
+            ->assertSee('https://www.themoviedb.org/movie/157336/watch?locale=ID', escape: false)
+            ->assertDontSee('Prime Video');
+
+        $media->refresh();
+
+        $this->assertSame(['Netflix', 'Apple TV', 'Google Play Movies'], array_column($media->watchProviders(), 'name'));
+        $this->assertSame(['rent', 'buy'], $media->watchProviders()[2]['types']);
+        $this->assertSame('https://image.tmdb.org/t/p/w92/netflix.jpg', $media->watchProviders()[0]['logo_url']);
+    }
+
+    public function test_titles_without_providers_in_the_region_say_so(): void
+    {
+        Http::fake([
+            'api.themoviedb.org/3/movie/*' => Http::response($this->tmdbMovie() + ['watch/providers' => ['results' => []]]),
+            'www.omdbapi.com/*' => Http::response($this->omdbPayload()),
+        ]);
+
+        $media = MediaCache::factory()->film()->create();
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(MediaDetail::class, ['media' => $media])
+            ->call('loadDetails')
+            ->assertSee('Belum tersedia di platform streaming mana pun di Indonesia.');
+
+        $this->assertFalse($this->service()->isStale($media->refresh()));
+    }
+
     public function test_the_detail_page_does_not_refetch_fresh_details(): void
     {
         Http::fake();
@@ -376,6 +433,7 @@ class MediaDetailsServiceTest extends TestCase
                 'creators' => [['id' => 66633, 'name' => 'Vince Gilligan', 'role' => null, 'photo_url' => null]],
                 'cast' => [],
             ],
+            'watch_providers' => ['region' => 'ID', 'link' => null, 'providers' => []],
             'details_synced_at' => now(),
         ]);
 

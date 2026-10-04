@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
     'poster_url', 'backdrop_url', 'synopsis', 'year', 'released_on',
     'genres', 'raw_payload', 'synced_at',
     'imdb_id', 'imdb_rating', 'imdb_votes', 'rotten_tomatoes_score',
-    'tmdb_rating', 'tmdb_votes', 'credits', 'details_synced_at',
+    'tmdb_rating', 'tmdb_votes', 'credits', 'watch_providers', 'details_synced_at',
     'title_latin', 'original_title_latin', 'synopsis_id', 'localized_hash',
 ])]
 class MediaCache extends Model
@@ -44,6 +44,7 @@ class MediaCache extends Model
             'tmdb_rating' => 'float',
             'tmdb_votes' => 'integer',
             'credits' => 'array',
+            'watch_providers' => 'array',
             'details_synced_at' => 'datetime',
         ];
     }
@@ -62,6 +63,16 @@ class MediaCache extends Model
     public function people(string $group): array
     {
         return $this->credits[$group] ?? [];
+    }
+
+    /**
+     * Platform tempat judul ini bisa ditonton, dari kolom watch_providers.
+     *
+     * @return list<array{id: int, name: string, logo_url: ?string, types: list<string>}>
+     */
+    public function watchProviders(): array
+    {
+        return $this->watch_providers['providers'] ?? [];
     }
 
     /**

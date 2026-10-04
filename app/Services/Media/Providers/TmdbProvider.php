@@ -40,6 +40,13 @@ class TmdbProvider implements MediaProvider, SearchesPeople
 
     private const PROFILE_SIZE = 'w185';
 
+    private const LOGO_SIZE = 'w92';
+
+    /**
+     * Kategori platform tonton dari TMDB, urut dari yang paling murah bagi penonton.
+     */
+    public const WATCH_PROVIDER_TYPES = ['flatrate', 'free', 'ads', 'rent', 'buy'];
+
     public function key(): string
     {
         return MediaSource::Tmdb->value;
@@ -277,6 +284,42 @@ class TmdbProvider implements MediaProvider, SearchesPeople
     }
 
     /**
+     * Film dan series yang sedang ramai minggu ini. Tanpa tipe, hasilnya
+     * campuran film & series (orang yang ikut trending dibuang).
+     *
+     * @return list<MediaResult>
+     *
+     * @throws RuntimeException kalau TMDB gagal dihubungi.
+     */
+    public function trending(?MediaType $type = null): array
+    {
+        $kind = match ($type) {
+            MediaType::Film => 'movie',
+            MediaType::Series => 'tv',
+            null => 'all',
+        };
+
+        // Hanya pemanis halaman Cari: gagal cepat, jangan menunggu ulang.
+        $response = $this->client()->timeout(5)->retry(1, 0, throw: false)->get(
+            $this->url("trending/{$kind}/week"),
+            $this->authQuery(['language' => config('services.tmdb.language')]),
+        );
+
+        if ($response->failed()) {
+            throw new RuntimeException("TMDB membalas {$response->status()}.");
+        }
+
+        $genreMap = $this->genreMap();
+
+        return collect(Arr::get($response->json(), 'results', []))
+            ->reject(fn (array $item) => ! config('services.tmdb.include_adult') && Arr::get($item, 'adult'))
+            ->map(fn (array $item) => $this->resultFromItem($item, $genreMap, $type))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Judul yang direkomendasikan TMDB berdasarkan satu judul (dasar
      * rekomendasi personal di insight AI).
      *
@@ -445,7 +488,7 @@ class TmdbProvider implements MediaProvider, SearchesPeople
                 'language' => config('services.tmdb.language'),
                 // Series memakai aggregate_credits: pemain & kru dari semua musim,
                 // bukan hanya musim terakhir seperti `credits`.
-                'append_to_response' => $film ? 'credits,external_ids' : 'aggregate_credits,external_ids',
+                'append_to_response' => $film ? 'credits,external_ids,watch/providers' : 'aggregate_credits,external_ids,watch/providers',
             ]),
         );
 
@@ -467,6 +510,47 @@ class TmdbProvider implements MediaProvider, SearchesPeople
             'rating' => $votes > 0 ? round((float) Arr::get($item, 'vote_average'), 1) : null,
             'votes' => $votes > 0 ? $votes : null,
             'credits' => $film ? $this->movieCredits($item) : $this->tvCredits($item),
+            'watch_providers' => $this->watchProviders($item),
+        ];
+    }
+
+    /**
+     * Platform tonton di negara yang dikonfigurasi (data JustWatch lewat TMDB).
+     * Satu platform bisa muncul di beberapa kategori, mis. sewa sekaligus beli.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array{region: string, link: ?string, providers: list<array{id: int, name: string, logo_url: ?string, types: list<string>}>}
+     */
+    private function watchProviders(array $item): array
+    {
+        $region = strtoupper((string) config('services.tmdb.watch_region'));
+        $country = Arr::get($item, "watch/providers.results.{$region}", []);
+        $providers = [];
+
+        foreach (self::WATCH_PROVIDER_TYPES as $type) {
+            foreach (Arr::get($country, $type, []) as $provider) {
+                $id = (int) Arr::get($provider, 'provider_id');
+
+                $providers[$id] ??= [
+                    'id' => $id,
+                    'name' => (string) Arr::get($provider, 'provider_name'),
+                    'logo_url' => $this->imageUrl(Arr::get($provider, 'logo_path'), self::LOGO_SIZE),
+                    'priority' => (int) Arr::get($provider, 'display_priority', PHP_INT_MAX),
+                    'types' => [],
+                ];
+
+                $providers[$id]['types'][] = $type;
+            }
+        }
+
+        return [
+            'region' => $region,
+            'link' => Arr::get($country, 'link'),
+            'providers' => collect($providers)
+                ->sortBy('priority')
+                ->map(fn (array $provider) => Arr::except($provider, 'priority'))
+                ->values()
+                ->all(),
         ];
     }
 

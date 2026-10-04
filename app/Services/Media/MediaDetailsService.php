@@ -14,9 +14,9 @@ use Throwable;
 
 /**
  * Info tambahan untuk halaman detail: rating TMDB, IMDb & Rotten Tomatoes,
- * serta pemain dan sutradara/kreator.
+ * pemain dan sutradara/kreator, serta platform tempat judul bisa ditonton.
  *
- * - TMDB: rating dan credits, sekaligus memberi IMDb ID.
+ * - TMDB: rating, credits, dan platform tonton (JustWatch), sekaligus memberi IMDb ID.
  * - OMDb (https://www.omdbapi.com): rating IMDb & Rotten Tomatoes dari IMDb ID.
  * - Anime (AniList/Jikan) tidak punya tautan ke keduanya, jadi dicari di OMDb
  *   lewat judul + tahun, lalu IMDb ID-nya dipakai untuk menemukan judul TMDB.
@@ -43,7 +43,8 @@ class MediaDetailsService
     {
         return $media->details_synced_at === null
             || $media->details_synced_at->lt(now()->subDays(self::TTL_DAYS))
-            || $this->creditsLackPersonIds($media);
+            || $this->creditsLackPersonIds($media)
+            || ($this->tmdb->isConfigured() && $media->watch_providers === null);
     }
 
     /**
@@ -120,7 +121,11 @@ class MediaDetailsService
                 'tmdb_rating' => $tmdb['rating'],
                 'tmdb_votes' => $tmdb['votes'],
                 'credits' => $tmdb['credits'],
+                'watch_providers' => $tmdb['watch_providers'],
             ];
+        } elseif (! $failed && $this->tmdb->isConfigured()) {
+            // Judul yang memang tidak ada di TMDB: dicatat kosong supaya tidak dicari ulang tiap kunjungan.
+            $updates['watch_providers'] = ['region' => null, 'link' => null, 'providers' => []];
         }
 
         if ($this->found($omdb)) {
