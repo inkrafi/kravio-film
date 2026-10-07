@@ -37,7 +37,7 @@
 
                 @case (FriendshipState::None)
                     <button type="button" wire:click="sendFriendRequest"
-                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                            class="rounded-lg bg-perak px-4 py-2 text-sm font-medium text-layar hover:bg-white">
                         Tambah Teman
                     </button>
                     @break
@@ -86,17 +86,66 @@
         </div>
     </header>
 
-    {{-- Favorit --}}
-    <section class="mt-10">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Favorit</h2>
+    {{-- Favorit; pemiliknya bisa membagikannya sebagai gambar atau tautan --}}
+    <section class="mt-10" x-data="{ sharing: false }">
+        <div class="flex items-baseline justify-between gap-3">
+            <h2 class="text-sm font-semibold text-gray-400">Favorit</h2>
+
+            @if ($this->isOwnProfile && $favorites->isNotEmpty() && $user->username)
+                <button type="button" x-on:click="sharing = ! sharing" :aria-expanded="sharing"
+                        class="text-sm font-semibold text-gray-200 underline underline-offset-4 hover:text-white">
+                    <span x-text="sharing ? 'Tutup' : 'Bagikan'">Bagikan</span>
+                </button>
+            @endif
+        </div>
 
         @if ($favorites->isEmpty())
-            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-2 text-sm text-gray-400">
                 {{ $this->isOwnProfile
-                    ? 'Belum ada favorit. Buka halaman judul mana pun lalu tekan "Jadikan Favorit".'
+                    ? 'Belum ada favorit. Buka halaman judul mana pun lalu tekan "Favorit".'
                     : 'Belum memilih judul favorit.' }}
             </p>
         @else
+            @if ($shareVersion)
+                @php
+                    $shareLink = route('favorites.share', $user);
+                    $imageUrl = fn (string $format, bool $download = false) => route('favorites.image', ['user' => $user, 'format' => $format]).'?v='.$shareVersion.($download ? '&unduh=1' : '');
+                @endphp
+
+                <div x-show="sharing" x-cloak x-transition.opacity class="mt-4 grid gap-6 rounded-md bg-kursi p-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                    <template x-if="sharing">
+                        <img src="{{ $imageUrl('kotak') }}" alt="Pratinjau gambar favoritmu" class="aspect-square w-full rounded-sm bg-layar">
+                    </template>
+
+                    <div x-data="{ copied: false, canShare: !! navigator.share }">
+                        <p class="text-sm text-gray-300">Gambar berisi favoritmu, dengan bio sebagai baris subtitle. Unduh lalu unggah ke Instagram, WhatsApp, atau X.</p>
+
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <a href="{{ $imageUrl('kotak', true) }}" class="rounded-md bg-perak px-4 py-2 text-sm font-semibold text-layar hover:bg-white">Unduh kotak</a>
+                            <a href="{{ $imageUrl('story', true) }}" class="rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-gray-600">Unduh story</a>
+                        </div>
+
+                        <x-input-label for="favorite-share-link" value="Tautan" class="mt-4" />
+                        <div class="mt-1 flex gap-2">
+                            <input id="favorite-share-link" type="text" readonly value="{{ $shareLink }}" x-on:focus="$el.select()"
+                                   class="min-w-0 flex-1 rounded-md border-gray-700 bg-layar text-sm text-gray-300 focus:border-gray-400 focus:ring-gray-400">
+                            <button type="button"
+                                    x-on:click="navigator.clipboard.writeText(@js($shareLink)); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="shrink-0 rounded-md bg-gray-700 px-3 text-sm font-semibold text-gray-100 hover:bg-gray-600"
+                                    x-text="copied ? 'Tersalin' : 'Salin'">Salin</button>
+                        </div>
+
+                        <button type="button" x-show="canShare" x-cloak
+                                x-on:click="navigator.share({ title: @js('Favorit '.$user->name), url: @js($shareLink) })"
+                                class="mt-2 rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-100 hover:bg-gray-600">
+                            Bagikan lewat aplikasi lain
+                        </button>
+
+                        <p class="mt-3 text-xs text-gray-500">Siapa pun yang punya tautan ini bisa melihat favoritmu tanpa login. Watched dan diary-mu tetap privat.</p>
+                    </div>
+                </div>
+            @endif
+
             <div class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 @foreach ($favorites as $favorite)
                     <a href="{{ $favorite->media->url() }}" wire:navigate wire:key="fav-{{ $favorite->id }}">
@@ -126,7 +175,7 @@
         @else
             {{-- Statistik --}}
             <div aria-labelledby="stats-heading">
-                <h2 id="stats-heading" class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Statistik</h2>
+                <h2 id="stats-heading" class="text-sm font-semibold text-gray-500 dark:text-gray-400">Statistik</h2>
 
                 <dl class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
@@ -204,9 +253,9 @@
                                 @foreach (array_slice($stats['genres'], 0, 3) as $genre)
                                     <a href="{{ route('genre.show', ['slug' => \App\Support\GenreNormalizer::slug($genre['name'])]) }}" wire:navigate
                                        title="{{ $genre['count'] }} judul"
-                                       class="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-200 dark:ring-indigo-800 dark:hover:bg-indigo-900/50">
+                                       class="inline-flex items-center gap-1.5 rounded-full bg-gray-800 px-3 py-1 text-sm font-medium text-perak ring-1 ring-inset ring-gray-400 hover:bg-gray-800 dark:bg-gray-700/30 dark:text-perak dark:ring-gray-400 dark:hover:bg-gray-700/50">
                                         {{ $genre['name'] }}
-                                        <span class="text-xs font-normal tabular-nums text-indigo-500 dark:text-indigo-300">{{ $genre['count'] }}</span>
+                                        <span class="text-xs font-normal tabular-nums text-perak dark:text-perak">{{ $genre['count'] }}</span>
                                     </a>
                                 @endforeach
                             </div>
@@ -229,7 +278,7 @@
                         wire:click="selectTab('{{ $value }}')"
                         @class([
                             'rounded-full px-4 py-1.5 text-sm font-medium transition',
-                            'bg-indigo-600 text-white' => $tab === $value,
+                            'bg-perak text-layar' => $tab === $value,
                             'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' => $tab !== $value,
                         ])
                     >
@@ -243,7 +292,7 @@
                 @if ($this->isOwnProfile)
                     <div class="mt-4 flex justify-end">
                         <a href="{{ route('lists.create') }}" wire:navigate
-                           class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">＋ Buat list</a>
+                           class="rounded-lg bg-perak px-4 py-2 text-sm font-medium text-layar hover:bg-white">＋ Buat list</a>
                     </div>
                 @endif
 

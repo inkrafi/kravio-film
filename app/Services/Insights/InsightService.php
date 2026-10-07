@@ -33,7 +33,7 @@ class InsightService
     public const SCHEDULE_MIN_AGE_DAYS = 6;
 
     private const INSTRUCTION = <<<'TEXT'
-        Kamu adalah teman nonton yang jeli untuk aplikasi Kravio (pencatat film & series ala Letterboxd).
+        Kamu adalah teman nonton yang jeli untuk aplikasi Kursi Penuh (pencatat dan rating film & series ala Letterboxd).
         Tulis dalam bahasa Indonesia yang santai tapi rapi, sapa pengguna dengan "kamu". Jangan pakai emoji.
 
         Dari data tontonan yang diberikan, buat:

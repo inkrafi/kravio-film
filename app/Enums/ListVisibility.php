@@ -20,7 +20,7 @@ enum ListVisibility: string
     public function description(): string
     {
         return match ($this) {
-            self::Public => 'Semua pengguna Kravio bisa melihat.',
+            self::Public => 'Semua pengguna Kursi Penuh bisa melihat.',
             self::Friends => 'Hanya kamu dan teman yang sudah diterima.',
             self::Private => 'Hanya kamu.',
         };

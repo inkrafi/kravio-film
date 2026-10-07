@@ -76,7 +76,8 @@ class MediaDetailTest extends TestCase
                 'aria-label="Breadcrumb"',
                 'href="'.route('search').'"', 'Cari',
                 'href="'.route('search', ['tipe' => 'series']).'"', 'Series',
-                'aria-current="page"', 'Breaking Bad',
+                // Judul tidak diulang di breadcrumb; ia tampil besar tepat di bawahnya.
+                '<h1', 'Breaking Bad',
             ], escape: false);
     }
 
@@ -359,23 +360,38 @@ class MediaDetailTest extends TestCase
             ->assertSet('rating', null);
     }
 
-    public function test_it_shows_the_average_rating_of_all_kravio_users(): void
+    public function test_kursi_penuh_is_the_share_of_viewers_who_rated_seven_or_more(): void
     {
-        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 8]);
-        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 9]);
+        foreach ([9, 8, 7, 7, 6, 5, 10, 8] as $rating) {
+            WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => $rating]);
+        }
         WatchEntry::factory()->unrated()->create(['media_cache_id' => $this->media->id]);
         // Watchlist tidak dihitung.
         WatchEntry::factory()->watchlist()->create(['media_cache_id' => $this->media->id]);
 
+        // 6 dari 8 rating bernilai 7 ke atas = 75%, rata-rata 7,5.
         $this->detail()
-            ->assertSee('★ 8,5')
-            ->assertSee('2 rating')
-            ->assertSee('3 orang sudah menonton');
+            ->assertSee('75%')
+            ->assertSee('Kursi Penuh 75%: 8 dari 10 kursi terisi')
+            ->assertSee('6 dari 8 penonton memberi 7 ke atas.')
+            ->assertSee('Rata-rata 7,5/10.')
+            ->assertSee('9 orang sudah menonton');
+    }
+
+    public function test_kursi_penuh_waits_for_enough_ratings(): void
+    {
+        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 9]);
+        WatchEntry::factory()->create(['media_cache_id' => $this->media->id, 'rating' => 8]);
+
+        $this->detail()
+            ->assertSee('Belum cukup penonton: baru 2 dari 5 rating yang dibutuhkan.')
+            ->assertSee('Skor Kursi Penuh belum tersedia')
+            ->assertDontSee('100%');
     }
 
     public function test_titles_without_ratings_say_so(): void
     {
-        $this->detail()->assertSee('Belum ada rating di Kravio');
+        $this->detail()->assertSee('Belum ada rating di Kursi Penuh');
     }
 
     public function test_it_shows_friends_ratings_and_reviews_but_not_strangers(): void

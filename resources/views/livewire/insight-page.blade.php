@@ -18,13 +18,13 @@
         @if ($configured && $enoughData)
             <div class="shrink-0 text-right">
                 @if ($pending)
-                    <span class="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
+                    <span class="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-perak dark:bg-gray-700/30 dark:text-perak">
                         <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                         Sedang dianalisis…
                     </span>
                 @elseif ($canRefresh)
                     <button type="button" wire:click="generate"
-                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                            class="rounded-lg bg-perak px-4 py-2 text-sm font-medium text-layar hover:bg-white">
                         {{ $insight ? 'Perbarui sekarang' : 'Buat insight sekarang' }}
                     </button>
                 @else
@@ -83,7 +83,7 @@
                 <dl class="mt-5 grid gap-3 sm:grid-cols-2">
                     @foreach ($content['highlights'] as $highlight)
                         <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900/40">
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">{{ $highlight['label'] }}</dt>
+                            <dt class="text-xs font-semibold text-perak dark:text-perak">{{ $highlight['label'] }}</dt>
                             <dd class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ $highlight['text'] }}</dd>
                         </div>
                     @endforeach
@@ -118,7 +118,7 @@
 
             @if (! $content['friends'])
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Belum ada teman dengan riwayat yang cukup untuk dibandingkan. <a href="{{ route('friends') }}" wire:navigate class="text-indigo-600 hover:underline dark:text-indigo-400">Cari teman</a>
+                    Belum ada teman dengan riwayat yang cukup untuk dibandingkan. <a href="{{ route('friends') }}" wire:navigate class="text-perak hover:underline dark:text-perak">Cari teman</a>
                 </p>
             @else
                 <ul class="mt-3 space-y-4">
@@ -133,7 +133,7 @@
                                             <span class="shrink-0 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">{{ round($match['similarity'] * 100) }}% mirip</span>
                                         </div>
                                         <div class="mt-1 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-700" aria-hidden="true">
-                                            <div class="h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" style="width: {{ max(2, round($match['similarity'] * 100)) }}%"></div>
+                                            <div class="h-1.5 rounded-full bg-gray-400 dark:bg-gray-300" style="width: {{ max(2, round($match['similarity'] * 100)) }}%"></div>
                                         </div>
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                             @if ($match['shared_genres'])

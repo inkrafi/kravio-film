@@ -18,7 +18,7 @@
         <div class="flex items-center justify-between border-b border-gray-100 px-4 py-2.5 dark:border-gray-700">
             <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Notifikasi</p>
             @if ($unreadCount)
-                <button type="button" wire:click="markAllAsRead" class="text-xs text-indigo-600 hover:underline dark:text-indigo-400">
+                <button type="button" wire:click="markAllAsRead" class="text-xs text-perak hover:underline dark:text-perak">
                     Tandai semua dibaca
                 </button>
             @endif
@@ -35,7 +35,7 @@
                         <button type="button" wire:click="open('{{ $notification->id }}')"
                                 @class([
                                     'flex w-full gap-3 px-4 py-3 text-start text-sm transition hover:bg-gray-50 dark:hover:bg-gray-700/50',
-                                    'bg-indigo-50/60 dark:bg-indigo-900/20' => $notification->unread(),
+                                    'bg-gray-800/60 dark:bg-gray-700/20' => $notification->unread(),
                                 ])>
                             @if ($actor)
                                 <x-avatar :user="$actor" size="h-8 w-8 text-xs" />
@@ -50,7 +50,7 @@
                             </span>
 
                             @if ($notification->unread())
-                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600" aria-label="Belum dibaca"></span>
+                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-perak" aria-label="Belum dibaca"></span>
                             @endif
                         </button>
                     </li>

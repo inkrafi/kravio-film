@@ -42,7 +42,7 @@ class TrendingService
      */
     public function titles(?MediaType $type = null): array
     {
-        $cacheKey = 'trending:'.($type->value ?? 'semua').':'.config('services.tmdb.language');
+        $cacheKey = $this->cacheKey($type);
 
         /** @var array{ids: list<int>, failed: list<string>}|null $cached */
         $cached = Cache::get($cacheKey);
@@ -59,6 +59,30 @@ class TrendingService
             'media' => collect($cached['ids'])->map(fn (int $id) => $models->get($id))->filter()->values(),
             'failed' => $cached['failed'],
         ];
+    }
+
+    /**
+     * Judul populer dari cache saja, tanpa memanggil API (untuk halaman yang
+     * harus selalu cepat, mis. landing page). Null kalau belum pernah diambil.
+     *
+     * @return Collection<int, MediaCache>|null
+     */
+    public function cached(?MediaType $type = null): ?Collection
+    {
+        $ids = Cache::get($this->cacheKey($type))['ids'] ?? null;
+
+        if (! $ids) {
+            return null;
+        }
+
+        $models = MediaCache::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        return collect($ids)->map(fn (int $id) => $models->get($id))->filter()->values();
+    }
+
+    private function cacheKey(?MediaType $type): string
+    {
+        return 'trending:'.($type->value ?? 'semua').':'.config('services.tmdb.language');
     }
 
     /**

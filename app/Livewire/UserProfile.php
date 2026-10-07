@@ -7,6 +7,7 @@ use App\Models\Favorite;
 use App\Models\MediaList;
 use App\Models\Review;
 use App\Models\User;
+use App\Services\FavoriteShareImageService;
 use App\Services\FriendshipService;
 use App\Services\ProfileStatsService;
 use Illuminate\Support\Facades\Auth;
@@ -46,7 +47,7 @@ class UserProfile extends Component
         $this->tab = $this->normalizedTab();
     }
 
-    public function render(FriendshipService $friendships, ProfileStatsService $stats)
+    public function render(FriendshipService $friendships, ProfileStatsService $stats, FavoriteShareImageService $images)
     {
         $viewer = Auth::user();
         $canViewLibrary = $viewer->can('viewLibrary', $this->user);
@@ -64,6 +65,8 @@ class UserProfile extends Component
             'state' => $friendships->stateBetween($viewer, $this->user),
             'canViewLibrary' => $canViewLibrary,
             'favorites' => $this->favorites(),
+            // Sidik isi gambar favorit, untuk tombol Bagikan milik pemilik profil.
+            'shareVersion' => $this->isOwnProfile ? $images->fingerprint($this->user) : null,
             'tabs' => $this->tabs(),
             'isDiary' => $isDiary,
             'isLists' => $isLists,

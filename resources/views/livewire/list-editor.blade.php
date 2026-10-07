@@ -4,7 +4,7 @@
     <header class="flex items-center justify-between gap-3">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $mediaList ? 'Ubah list' : 'List baru' }}</h1>
         @if ($mediaList)
-            <a href="{{ $mediaList->url() }}" wire:navigate class="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">Lihat list →</a>
+            <a href="{{ $mediaList->url() }}" wire:navigate class="text-sm font-medium text-perak hover:underline dark:text-perak">Lihat list →</a>
         @endif
     </header>
 
@@ -13,14 +13,14 @@
         <div>
             <label for="list-title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Judul</label>
             <input id="list-title" type="text" wire:model="title" maxlength="100" placeholder="mis. Top 10 Anime 2024"
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
             @error('title') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
         <div>
             <label for="list-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi <span class="font-normal text-gray-400">(opsional)</span></label>
             <textarea id="list-description" wire:model="description" rows="3" maxlength="2000"
-                      class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+                      class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
             @error('description') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
         </div>
 
@@ -30,11 +30,11 @@
                 @foreach ($visibilities as $option)
                     <label @class([
                         'flex cursor-pointer flex-col rounded-md border p-3 text-sm',
-                        'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' => $visibility === $option->value,
+                        'border-gray-400 bg-gray-800 dark:bg-gray-700/20' => $visibility === $option->value,
                         'border-gray-200 dark:border-gray-700' => $visibility !== $option->value,
                     ])>
                         <span class="flex items-center gap-2 font-medium text-gray-900 dark:text-gray-100">
-                            <input type="radio" wire:model.live="visibility" value="{{ $option->value }}" class="text-indigo-600 focus:ring-indigo-500">
+                            <input type="radio" wire:model.live="visibility" value="{{ $option->value }}" class="text-perak focus:ring-gray-400">
                             {{ $option->label() }}
                         </span>
                         <span class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $option->description() }}</span>
@@ -44,13 +44,13 @@
         </fieldset>
 
         <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input type="checkbox" wire:model="isRanked" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900">
+            <input type="checkbox" wire:model="isRanked" class="rounded border-gray-300 text-perak focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-900">
             Tampilkan nomor urut (list peringkat, mis. "Top 10")
         </label>
 
         <div class="flex items-center justify-end gap-3">
             <x-action-message on="list-saved">Tersimpan.</x-action-message>
-            <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            <button type="submit" class="rounded-lg bg-perak px-4 py-2 text-sm font-medium text-layar hover:bg-white">
                 {{ $mediaList ? 'Simpan' : 'Buat list & tambah judul' }}
             </button>
         </div>
@@ -61,7 +61,7 @@
         <section class="mt-8" aria-labelledby="add-heading">
             <h2 id="add-heading" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Tambah judul</h2>
             <input type="search" wire:model.live.debounce.400ms="query" placeholder="Cari film, series, atau anime…" aria-label="Cari judul untuk ditambahkan"
-                   class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+                   class="mt-2 block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
             @error('query') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
 
             <div wire:loading.delay wire:target="query" class="mt-2 text-sm text-gray-500">mencari…</div>
@@ -83,7 +83,7 @@
                                 <span class="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">✓ Di list</span>
                             @else
                                 <button type="button" wire:click="addMedia({{ $result->id }})"
-                                        class="shrink-0 rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700">Tambah</button>
+                                        class="shrink-0 rounded-md bg-perak px-3 py-1 text-xs font-medium text-layar hover:bg-white">Tambah</button>
                             @endif
                         </li>
                     @endforeach
@@ -128,7 +128,7 @@
                                 <label for="note-{{ $item->id }}" class="sr-only">Catatan untuk {{ $item->media->title }}</label>
                                 <textarea id="note-{{ $item->id }}" wire:model.blur="notes.{{ $item->id }}" rows="1" maxlength="{{ MediaListItem::MAX_NOTE_LENGTH }}"
                                           placeholder="Catatan (opsional), disimpan otomatis"
-                                          class="mt-1.5 block w-full rounded-md border-gray-200 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
+                                          class="mt-1.5 block w-full rounded-md border-gray-200 text-xs shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"></textarea>
                                 @error('notes.'.$item->id) <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                             </div>
 

@@ -40,7 +40,7 @@
         <div class="flex shrink-0 flex-wrap items-center gap-2">
             @can('update', $list)
                 <a href="{{ route('lists.edit', ['list' => $list->id]) }}" wire:navigate
-                   class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Ubah list</a>
+                   class="rounded-lg bg-perak px-4 py-2 text-sm font-medium text-layar hover:bg-white">Ubah list</a>
                 <button type="button" wire:click="deleteList" wire:confirm="Hapus list “{{ $list->title }}”? Tindakan ini tidak bisa dibatalkan."
                         class="rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">Hapus</button>
                 @if ($list->likes_count)
@@ -96,7 +96,7 @@
 
     {{-- Komentar --}}
     <section class="mt-12" aria-labelledby="list-comments-heading">
-        <h2 id="list-comments-heading" class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <h2 id="list-comments-heading" class="text-sm font-semibold text-gray-500 dark:text-gray-400">
             Komentar @if ($comments->isNotEmpty()) <span class="font-normal normal-case">({{ $comments->count() }})</span> @endif
         </h2>
 
@@ -104,13 +104,13 @@
             <label for="list-comment" class="sr-only">Tulis komentar</label>
             <textarea id="list-comment" wire:model="commentBody" rows="2" maxlength="{{ MediaListComment::MAX_LENGTH }}"
                       placeholder="Tulis komentar tentang list ini…"
-                      class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"></textarea>
+                      class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"></textarea>
             @error('commentBody')
                 <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
             @enderror
             <div class="mt-2 flex justify-end">
                 <button type="submit" wire:loading.attr="disabled" wire:target="postComment"
-                        class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">Kirim</button>
+                        class="rounded-lg bg-perak px-4 py-1.5 text-sm font-medium text-layar hover:bg-white disabled:opacity-60">Kirim</button>
             </div>
         </form>
 
@@ -125,7 +125,7 @@
                             <div class="flex flex-wrap items-baseline gap-x-2 text-sm">
                                 <a href="{{ route('profile.show', $comment->user) }}" wire:navigate class="font-medium text-gray-900 hover:underline dark:text-gray-100">{{ $comment->user->name }}</a>
                                 @if ($comment->user_id === $list->user_id)
-                                    <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">Pembuat list</span>
+                                    <span class="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-semibold text-perak dark:bg-gray-700/40 dark:text-perak">Pembuat list</span>
                                 @endif
                                 <time datetime="{{ $comment->created_at->toIso8601String() }}" class="text-xs text-gray-400 dark:text-gray-500">{{ $comment->created_at->locale('id')->diffForHumans() }}</time>
                                 @can('deleteComment', [$list, $comment])

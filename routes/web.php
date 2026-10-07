@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\FavoriteShareController;
+use App\Http\Controllers\LandingController;
 use App\Livewire\Dashboard;
 use App\Livewire\Friends;
 use App\Livewire\GenreBrowse;
@@ -14,7 +16,13 @@ use App\Models\MediaCache;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+Route::get('/', LandingController::class)->name('home');
+
+// Favorit yang dibagikan: bisa dibuka dan dipratinjau di WA/X tanpa login.
+Route::get('u/{user}/favorit', [FavoriteShareController::class, 'show'])->name('favorites.share');
+Route::get('u/{user}/favorit/{format}.png', [FavoriteShareController::class, 'image'])
+    ->whereIn('format', ['kotak', 'story'])
+    ->name('favorites.image');
 
 Route::middleware('auth')->group(function () {
     Route::get('search', MediaSearch::class)->name('search');

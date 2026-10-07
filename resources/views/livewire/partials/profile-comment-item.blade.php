@@ -11,7 +11,7 @@
                 {{ $comment->commenter->name }}
             </a>
             @if ($comment->commenter_id === $comment->profile_user_id)
-                <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">Pemilik profil</span>
+                <span class="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-semibold text-perak dark:bg-gray-700/40 dark:text-perak">Pemilik profil</span>
             @endif
             <time datetime="{{ $comment->created_at->toIso8601String() }}"
                   title="{{ $comment->created_at->locale('id')->translatedFormat('j F Y, H:i') }}"
@@ -21,7 +21,7 @@
 
             @if ($canReply)
                 <button type="button" wire:click="startReply({{ $comment->id }})"
-                        class="text-xs text-gray-400 hover:text-indigo-600 dark:text-gray-500 dark:hover:text-indigo-400">
+                        class="text-xs text-gray-400 hover:text-white dark:text-gray-500 dark:hover:text-white">
                     Balas
                 </button>
             @endif

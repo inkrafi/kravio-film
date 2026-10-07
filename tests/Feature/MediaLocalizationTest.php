@@ -252,17 +252,17 @@ class MediaLocalizationTest extends TestCase
         $this->assertSame('Lee Sun-kyun', $media->fresh()->people('cast')[0]['name_latin']);
     }
 
-    public function test_cards_show_the_latin_title_and_indonesian_genres(): void
+    public function test_cards_show_the_latin_title_type_and_year(): void
     {
         $media = MediaCache::factory()->series()->make([
             'title' => '나의 아저씨',
             'title_latin' => 'My Mister',
-            'genres' => ['Drama', 'Ninja', 'Action'],
+            'year' => 2018,
         ]);
 
+        // Genre sengaja tidak ditampilkan di kartu; posternya yang bicara.
         $this->blade('<x-media-card :media="$media" />', ['media' => $media])
             ->assertSee('My Mister')
-            ->assertSee('Drama, Aksi')
-            ->assertDontSee('Ninja');
+            ->assertSee('Series, 2018');
     }
 }

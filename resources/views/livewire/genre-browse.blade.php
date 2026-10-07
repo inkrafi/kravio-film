@@ -26,7 +26,7 @@
                     wire:click="selectType('{{ $case->value }}')"
                     @class([
                         'rounded-full px-4 py-1.5 text-sm font-medium transition',
-                        'bg-indigo-600 text-white' => $type === $case->value,
+                        'bg-perak text-layar' => $type === $case->value,
                         'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' => $type !== $case->value,
                     ])
                 >

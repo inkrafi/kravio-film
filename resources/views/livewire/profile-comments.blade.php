@@ -7,7 +7,7 @@
     aria-labelledby="comments-heading"
     @if ($canView) wire:poll.{{ ProfileComments::POLL_SECONDS }}s.visible @endif
 >
-    <h2 id="comments-heading" class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+    <h2 id="comments-heading" class="text-sm font-semibold text-gray-500 dark:text-gray-400">
         Komentar @if ($total) <span class="font-normal normal-case">({{ $total }})</span> @endif
     </h2>
 
@@ -26,7 +26,7 @@
                     rows="2"
                     maxlength="{{ ProfileComment::MAX_LENGTH }}"
                     placeholder="Tulis komentar untuk {{ $user->name }}…"
-                    class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                    class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 ></textarea>
 
                 @error('body')
@@ -38,7 +38,7 @@
                         type="submit"
                         wire:loading.attr="disabled"
                         wire:target="post"
-                        class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                        class="rounded-lg bg-perak px-4 py-1.5 text-sm font-medium text-layar hover:bg-white disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="post">Kirim</span>
                         <span wire:loading wire:target="post">Mengirim…</span>
@@ -81,7 +81,7 @@
                                             maxlength="{{ ProfileComment::MAX_LENGTH }}"
                                             placeholder="Balas {{ $comment->commenter->name }}…"
                                             x-init="$el.focus()"
-                                            class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                            class="block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                                         ></textarea>
 
                                         @error('replyBody')
@@ -94,7 +94,7 @@
                                                 Batal
                                             </button>
                                             <button type="submit" wire:loading.attr="disabled" wire:target="postReply"
-                                                    class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
+                                                    class="rounded-lg bg-perak px-4 py-1.5 text-sm font-medium text-layar hover:bg-white disabled:opacity-60">
                                                 <span wire:loading.remove wire:target="postReply">Balas</span>
                                                 <span wire:loading wire:target="postReply">Mengirim…</span>
                                             </button>
@@ -109,7 +109,7 @@
 
             @if ($hasMore)
                 <button type="button" wire:click="loadMore"
-                        class="mt-4 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                        class="mt-4 text-sm font-medium text-perak hover:underline dark:text-perak">
                     Muat komentar lebih lama
                 </button>
             @endif

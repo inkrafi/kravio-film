@@ -1,9 +1,7 @@
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <header class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Cari tontonan</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Film dan series dari TMDB, termasuk anime dari AniList — dalam satu kolom pencarian.
-        </p>
+        <h1 class="font-extra-condensed text-4xl font-extrabold leading-none tracking-tight text-white sm:text-5xl">Cari tontonan</h1>
+        <p class="mt-2 text-gray-400">Film, series, dan anime dalam satu pencarian.</p>
     </header>
 
     {{-- Search bar --}}
@@ -20,7 +18,7 @@
             placeholder="Judul film, series, atau anime…"
             autofocus
             aria-label="Kata kunci pencarian"
-            class="block w-full rounded-lg border-gray-300 bg-white py-3 pl-10 pr-24 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+            class="block w-full rounded-lg border-gray-300 bg-white py-3 pl-10 pr-24 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
         >
 
         <div class="absolute inset-y-0 right-0 flex items-center gap-2 pr-3">
@@ -50,7 +48,7 @@
                 wire:click="selectType('{{ $value }}')"
                 @class([
                     'rounded-full px-4 py-1.5 text-sm font-medium transition',
-                    'bg-indigo-600 text-white' => $type === $value,
+                    'bg-perak text-layar' => $type === $value,
                     'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700' => $type !== $value,
                 ])
             >
@@ -93,12 +91,10 @@
         {{-- Skeleton saat memuat --}}
         <div wire:loading.delay wire:target="query, type, selectType" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             @for ($i = 0; $i < 12; $i++)
-                <div class="animate-pulse overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
-                    <div class="aspect-[2/3] w-full bg-gray-200 dark:bg-gray-700"></div>
-                    <div class="space-y-2 p-3">
-                        <div class="h-3 w-4/5 rounded bg-gray-200 dark:bg-gray-700"></div>
-                        <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-gray-700"></div>
-                    </div>
+                <div class="animate-pulse">
+                    <div class="aspect-[2/3] w-full rounded-sm bg-gray-800"></div>
+                    <div class="mt-2 h-3 w-4/5 rounded bg-gray-800"></div>
+                    <div class="mt-1.5 h-3 w-2/5 rounded bg-gray-800"></div>
                 </div>
             @endfor
         </div>
@@ -121,7 +117,7 @@
                 {{-- Orang (aktor, sutradara, …) yang namanya cocok; hanya di tab Semua --}}
                 @if ($results->people)
                     <section class="mb-8" aria-labelledby="people-heading">
-                        <h2 id="people-heading" class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Orang</h2>
+                        <h2 id="people-heading" class="mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">Orang</h2>
 
                         <ul class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($results->people as $person)

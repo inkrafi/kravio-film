@@ -69,7 +69,7 @@ new class extends Component
     <div class="mt-6 flex items-center gap-5">
         {{-- Pratinjau: foto yang baru dipilih, atau foto saat ini --}}
         @if ($photo && ! $errors->has('photo'))
-            <span class="inline-flex h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500">
+            <span class="inline-flex h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-gray-400">
                 <img src="{{ $photo->temporaryUrl() }}" alt="Pratinjau foto profil" class="h-full w-full object-cover">
             </span>
         @else
@@ -85,7 +85,7 @@ new class extends Component
                     Batal
                 </button>
             @else
-                <label class="inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm hover:bg-gray-50 focus-within:ring-2 focus-within:ring-indigo-500 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                <label class="inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus-within:ring-2 focus-within:ring-gray-400 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
                     {{ auth()->user()->avatar_path ? 'Ganti foto' : 'Pilih foto' }}
                     <input type="file" wire:model="photo" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only">
                 </label>

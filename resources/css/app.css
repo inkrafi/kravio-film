@@ -1,3 +1,60 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: dark;
+    }
+
+    /* Archivo punya sumbu lebar; judul memakai versi rapat seperti poster bioskop. */
+    h1 {
+        font-stretch: 75%;
+    }
+
+    :focus-visible {
+        outline: 2px solid theme('colors.perak');
+        outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+@layer components {
+    /* Kata-kata orang (review, komentar) ditampilkan seperti baris subtitle film. */
+    .subtitle {
+        color: theme('colors.subtitle');
+        font-weight: 600;
+        text-shadow:
+            0 0 2px #000,
+            0 1px 3px rgb(0 0 0 / 0.85);
+    }
+}
+
+/* Kursi pada hero landing page terisi satu per satu, sekali saat halaman dibuka. */
+@keyframes seat-fill {
+    from {
+        color: theme('colors.gray.700');
+    }
+}
+
+.seat-fill {
+    animation: seat-fill 420ms ease-out both;
+}
+
+@layer utilities {
+    .font-condensed {
+        font-stretch: 75%;
+    }
+
+    .font-extra-condensed {
+        font-stretch: 62%;
+    }
+}

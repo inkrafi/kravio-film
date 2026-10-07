@@ -117,6 +117,14 @@ class MediaCache extends Model
         return GenreNormalizer::normalize($this->genres);
     }
 
+    /**
+     * Backdrop TMDB disimpan berukuran w780; untuk hero selebar layar dipakai w1280.
+     */
+    public function heroBackdropUrl(): ?string
+    {
+        return $this->backdrop_url ? str_replace('/w780/', '/w1280/', $this->backdrop_url) : null;
+    }
+
     public function imdbUrl(): ?string
     {
         return $this->imdb_id ? "https://www.imdb.com/title/{$this->imdb_id}/" : null;

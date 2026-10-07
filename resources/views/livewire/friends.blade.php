@@ -12,7 +12,7 @@
 
     {{-- Permintaan masuk --}}
     <section>
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400">
             Permintaan Masuk ({{ $incoming->count() }})
         </h2>
 
@@ -49,7 +49,7 @@
     {{-- Permintaan terkirim --}}
     @if ($outgoing->isNotEmpty())
         <section class="mt-8">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400">
                 Menunggu Konfirmasi ({{ $outgoing->count() }})
             </h2>
 
@@ -76,7 +76,7 @@
 
     {{-- Daftar teman --}}
     <section class="mt-8">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400">
             Teman Saya ({{ $friends->count() }})
         </h2>
 
@@ -106,14 +106,14 @@
 
     {{-- Cari teman baru --}}
     <section class="mt-8">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Cari Teman</h2>
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400">Cari Teman</h2>
 
         <input
             type="search"
             wire:model.live.debounce.400ms="query"
             placeholder="Cari username atau nama…"
             aria-label="Cari pengguna"
-            class="mt-3 block w-full rounded-lg border-gray-300 bg-white py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            class="mt-3 block w-full rounded-lg border-gray-300 bg-white py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gray-400 focus:ring-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
         >
 
         @if (trim($query) !== '')
@@ -134,7 +134,7 @@
                             </a>
 
                             <button type="button" wire:click="add({{ $candidate->id }})"
-                                    class="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                                    class="shrink-0 rounded-lg bg-perak px-3 py-1.5 text-sm font-medium text-layar hover:bg-white">
                                 Tambah
                             </button>
                         </li>

@@ -11,8 +11,10 @@ use App\Models\WatchEntry;
 use App\Services\FriendshipService;
 use App\Services\Media\MediaDetailsService;
 use App\Services\Media\MediaLocalizationService;
+use App\Support\KursiPenuh;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,6 +28,9 @@ class MediaDetail extends Component
     public const MIN_RATING = 1;
 
     public const MAX_RATING = 10;
+
+    /** Subtitle sungguhan jarang lebih dari dua baris. */
+    private const SUBTITLE_LENGTH = 140;
 
     public MediaCache $media;
 
@@ -53,12 +58,15 @@ class MediaDetail extends Component
     public function render(FriendshipService $friendships)
     {
         $friendEntries = $this->friendEntries($friendships->friendIdsOf(Auth::user()));
+        $friendReviews = $this->friendReviews($friendEntries);
+        $review = $this->currentReview();
 
         return view('livewire.media-detail', [
-            'review' => $this->currentReview(),
+            'review' => $review,
+            'subtitle' => $this->subtitleLine($friendEntries, $friendReviews, $review),
             'community' => $this->communityRating(),
             'friendEntries' => $friendEntries,
-            'friendReviews' => $this->friendReviews($friendEntries),
+            'friendReviews' => $friendReviews,
             'favoriteCount' => Favorite::where('user_id', Auth::id())->count(),
             'maxFavorites' => Favorite::MAX_PER_USER,
             'detailsPending' => ! $this->detailsChecked && $this->detailsNeedRefresh(),
@@ -81,18 +89,23 @@ class MediaDetail extends Component
     }
 
     /**
-     * Rata-rata rating semua pengguna Kravio. Hanya angka gabungan, jadi tidak
-     * membuka pustaka siapa pun yang bukan teman.
+     * Skor Kursi Penuh dan rata-rata dari semua penonton di platform ini.
+     * Hanya angka gabungan, jadi tidak membuka pustaka siapa pun yang bukan teman.
      *
-     * @return array{average: ?float, ratings: int, watched: int}
+     * @return array{score: ?int, average: ?float, ratings: int, liked: int, watched: int}
      */
     private function communityRating(): array
     {
         $watched = WatchEntry::query()->where('media_cache_id', $this->media->id)->watched();
+        $ratings = (clone $watched)->whereNotNull('rating')->count();
+        $liked = (clone $watched)->where('rating', '>=', KursiPenuh::LIKED_FROM)->count();
+        $average = (clone $watched)->avg('rating');
 
         return [
-            'average' => ($average = (clone $watched)->avg('rating')) !== null ? round((float) $average, 1) : null,
-            'ratings' => (clone $watched)->whereNotNull('rating')->count(),
+            'score' => KursiPenuh::score($liked, $ratings),
+            'average' => $average !== null ? round((float) $average, 1) : null,
+            'ratings' => $ratings,
+            'liked' => $liked,
             'watched' => $watched->count(),
         ];
     }
@@ -139,6 +152,32 @@ class MediaDetail extends Component
             ->whereIn('user_id', $friendEntries->pluck('user_id'))
             ->get()
             ->keyBy('user_id');
+    }
+
+    /**
+     * Satu kalimat orang untuk ditampilkan seperti subtitle di atas backdrop:
+     * review teman terbaru dulu, kalau tidak ada review sendiri. Review yang
+     * ditandai spoiler tidak pernah dipakai.
+     *
+     * @param  Collection<int, WatchEntry>  $friendEntries
+     * @param  Collection<int, Review>  $friendReviews
+     * @return array{body: string, name: string, rating: ?int}|null
+     */
+    private function subtitleLine(Collection $friendEntries, Collection $friendReviews, ?Review $review): ?array
+    {
+        foreach ($friendEntries as $entry) {
+            $friendReview = $friendReviews->get($entry->user_id);
+
+            if ($friendReview && ! $friendReview->contains_spoiler) {
+                return ['body' => Str::limit(Str::squish($friendReview->body), self::SUBTITLE_LENGTH), 'name' => $entry->user->name, 'rating' => $entry->rating];
+            }
+        }
+
+        if ($review && ! $review->contains_spoiler) {
+            return ['body' => Str::limit(Str::squish($review->body), self::SUBTITLE_LENGTH), 'name' => 'Kamu', 'rating' => $this->rating];
+        }
+
+        return null;
     }
 
     private function detailsNeedRefresh(): bool
